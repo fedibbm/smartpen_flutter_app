@@ -1,0 +1,628 @@
+================================================================================
+                        OCR API ENDPOINT DOCUMENTATION
+                              POST /ocr Route
+================================================================================
+
+BASE URL: http://localhost:5000
+ENDPOINT: /ocr
+METHOD: POST
+MAX FILE SIZE: 16 MB
+TIMEOUT: No explicit timeout (depends on image size and complexity)
+
+================================================================================
+                            SUPPORTED FILE FORMATS
+================================================================================
+
+- PNG (.png)
+- JPEG (.jpg, .jpeg)
+- BMP (.bmp)
+- TIFF (.tiff)
+
+================================================================================
+                            INPUT METHODS
+================================================================================
+
+METHOD 1: FILE UPLOAD (multipart/form-data)
+--------------------------------------------
+
+Content-Type: multipart/form-data
+
+Form Fields:
+  - file (required): Image file
+  - auto_detect (optional): "true" or "false" (default: "true")
+      - If true: Automatically detects language (ara/eng/fra)
+      - If false: Uses default_lang parameter
+  - default_lang (optional): "ara", "eng", or "fra" (default: "ara")
+      - Language to use when auto_detect=false or detection fails
+  - include_boxes (optional): "true" or "false" (default: "true")
+      - If true: Returns character-level bounding boxes
+      - If false: Only returns extracted text
+
+Example cURL:
+-------------
+curl -X POST http://localhost:5000/ocr \
+  -F "file=@/path/to/image.png" \
+  -F "auto_detect=true" \
+  -F "default_lang=ara" \
+  -F "include_boxes=true"
+
+
+METHOD 2: BASE64 ENCODED IMAGE (application/json)
+--------------------------------------------------
+
+Content-Type: application/json
+
+JSON Body:
+{
+  "image": "base64_encoded_string_here",
+  "auto_detect": true,           // optional, default: true
+  "default_lang": "ara",          // optional, default: "ara"
+  "include_boxes": true           // optional, default: true
+}
+
+Base64 Format:
+  - Can include data URI header: "data:image/png;base64,iVBORw0KG..."
+  - Or raw base64 string: "iVBORw0KG..."
+  - Server automatically strips header if present
+
+Example cURL:
+-------------
+curl -X POST http://localhost:5000/ocr \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA...",
+    "auto_detect": true,
+    "default_lang": "ara",
+    "include_boxes": true
+  }'
+
+Example Python (base64):
+------------------------
+import requests
+import base64
+
+with open("image.png", "rb") as f:
+    img_base64 = base64.b64encode(f.read()).decode('utf-8')
+
+response = requests.post(
+    "http://localhost:5000/ocr",
+    json={
+        "image": img_base64,
+        "auto_detect": True,
+        "default_lang": "ara",
+        "include_boxes": True
+    }
+)
+print(response.json())
+
+================================================================================
+                            PROCESSING PIPELINE
+================================================================================
+
+1. IMAGE RECEPTION
+   - File upload: Saved to uploads/ with timestamp prefix
+   - Base64: Decoded and saved to uploads/ with timestamp prefix
+   - Filename format: YYYYMMDD_HHMMSS_originalname.ext
+
+2. IMAGE PREPROCESSING
+   - Conversion to grayscale (improves OCR accuracy)
+   - Adaptive thresholding (OTSU method)
+   - Median blur noise removal (kernel size: 5)
+
+3. LANGUAGE DETECTION (if auto_detect=true)
+   - Preliminary OCR pass with multiple languages: eng+ara+fra
+   - Language detection using langdetect library
+   - Mapping to Tesseract language codes:
+     * ar → ara (Arabic)
+     * en → eng (English)
+     * fr → fra (French)
+   - Falls back to default_lang if detection fails
+
+4. OCR EXTRACTION
+   - Runs Tesseract OCR with detected/specified language
+   - Extracts text from preprocessed image
+   - Returns full text content
+
+5. CHARACTER BOUNDING BOXES (if include_boxes=true)
+   - Uses pytesseract.image_to_boxes() for character-level detection
+   - Returns coordinates for each detected character
+   - Coordinates converted from Tesseract format (bottom-left origin)
+     to OpenCV format (top-left origin)
+
+6. OUTPUT FILE CREATION
+   - Creates .txt file in outputs/ folder
+   - Filename matches input: YYYYMMDD_HHMMSS_originalname.txt
+   - Contains: language, timestamp, character count, extracted text
+
+================================================================================
+                            SUCCESS RESPONSE
+================================================================================
+
+HTTP Status: 200 OK
+Content-Type: application/json
+
+Response Structure:
+{
+  "success": true,
+  "text": "الن extracted text content here...",
+  "language": "ara",
+  "character_count": 152,
+  "output_file": "outputs/20251210_143022_image.txt",
+  "input_file": "uploads/20251210_143022_image.png",
+  "timestamp": "2025-12-10T14:30:22.456789",
+  "boxes": [
+    {
+      "char": "ا",
+      "x": 145,
+      "y": 89,
+      "width": 12,
+      "height": 24
+    },
+    {
+      "char": "l",
+      "x": 157,
+      "y": 91,
+      "width": 8,
+      "height": 22
+    }
+    // ... more character boxes
+  ]
+}
+
+Field Descriptions:
+-------------------
+- success (boolean): Always true for successful requests
+- text (string): Full extracted text content (UTF-8 encoded)
+- language (string): Detected or used language code (ara/eng/fra)
+- character_count (integer): Total number of characters detected
+- output_file (string): Path to saved text file in outputs/
+- input_file (string): Path to saved image file in uploads/
+- timestamp (string): ISO 8601 format timestamp of processing
+- boxes (array): Character bounding boxes (only if include_boxes=true)
+  * char (string): The detected character
+  * x (integer): X coordinate (left edge, pixels)
+  * y (integer): Y coordinate (top edge, pixels)
+  * width (integer): Width of bounding box (pixels)
+  * height (integer): Height of bounding box (pixels)
+
+================================================================================
+                            ERROR RESPONSES
+================================================================================
+
+ERROR 1: No File Selected
+--------------------------
+HTTP Status: 400 Bad Request
+{
+  "error": "No file selected"
+}
+Cause: File upload sent with empty filename
+
+
+ERROR 2: Invalid File Type
+---------------------------
+HTTP Status: 400 Bad Request
+{
+  "error": "File type not allowed"
+}
+Cause: File extension not in [png, jpg, jpeg, bmp, tiff]
+
+
+ERROR 3: No Image Provided
+---------------------------
+4. Response
+Returns JSON with:
+
+￼
+{  "success": true,  "text": "extracted text...",  "language": "ara",  "character_count": 42,  "boxes": [...],  "output_file": "outputs/20251209_114552_image.txt",  "input_file": "uploads/20251209_114552_image.png",  "timestamp": "2025-12-09T11:45:52.123456"}
+Key Points:
+
+Both upload methods save to uploads before processing
+Timestamp prefix links input/output files
+Base64 method is designed for mobile apps (no file handling needed)
+Max file size: 16MB
+Supported formats: png, jpg, j
+HTTP Status: 400 Bad Request
+{
+  "error": "No image provided. Send as \"file\" or \"image\" (base64)"
+}
+Cause: Request missing both 'file' (multipart) and 'image' (JSON) fields
+
+
+ERROR 4: Failed to Load Image
+------------------------------
+HTTP Status: 400 Bad Request
+{
+  "error": "Failed to load image"
+}
+Cause: Image corrupted, invalid format, or decoding failed
+
+
+ERROR 5: File Too Large
+-----------------------
+HTTP Status: 413 Request Entity Too Large
+{
+  "error": "File too large"
+}
+Cause: Image exceeds 16 MB limit
+
+
+ERROR 6: Server Error
+----------------------
+HTTP Status: 500 Internal Server Error
+{
+  "error": "Detailed error message here"
+}
+Cause: OCR processing failure, file system errors, etc.
+
+================================================================================
+                        LANGUAGE SUPPORT DETAILS
+================================================================================
+
+Supported Languages:
+--------------------
+1. Arabic (ara)
+   - Tesseract code: ara
+   - Detection code: ar
+   - Default language for the system
+   - Includes Arabic script recognition
+   - Right-to-left text support
+
+2. English (eng)
+   - Tesseract code: eng
+   - Detection code: en
+   - Latin alphabet recognition
+
+3. French (fra)
+   - Tesseract code: fra
+   - Detection code: fr
+   - Latin alphabet with accented characters
+
+Language Detection Process:
+----------------------------
+1. Runs preliminary OCR with all three languages: "eng+ara+fra"
+2. Uses langdetect library on preliminary text
+3. Maps detected language to Tesseract code
+4. Minimum text length for detection: 3 characters
+5. Falls back to default_lang if:
+   - Text too short
+   - Detection throws exception
+   - Detected language not in supported list
+
+================================================================================
+                            FILE STORAGE
+================================================================================
+
+Uploads Folder: uploads/
+-------------------------
+- Stores all received images
+- Naming: YYYYMMDD_HHMMSS_originalfilename.ext
+- Not automatically cleaned (manual cleanup required)
+- Used for reference and debugging
+
+Outputs Folder: outputs/
+-------------------------
+- Stores OCR results as text files
+- Naming: YYYYMMDD_HHMMSS_originalfilename.txt
+- Format:
+    Language: ara
+    Timestamp: 2025-12-10 14:30:22
+    Characters detected: 152
+
+    ==================================================
+
+    [Extracted text content here]
+
+- Accessible via GET /output/<filename> endpoint
+- Not automatically cleaned (manual cleanup required)
+
+================================================================================
+                        INTEGRATION EXAMPLES
+================================================================================
+
+JAVASCRIPT (FETCH API)
+----------------------
+// File upload
+const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+formData.append('auto_detect', 'true');
+formData.append('include_boxes', 'true');
+
+fetch('http://localhost:5000/ocr', {
+  method: 'POST',
+  body: formData
+})
+.then(response => response.json())
+.then(data => {
+  console.log('Text:', data.text);
+  console.log('Language:', data.language);
+  console.log('Boxes:', data.boxes);
+})
+.catch(error => console.error('Error:', error));
+
+
+// Base64
+const reader = new FileReader();
+reader.onload = function(e) {
+  const base64 = e.target.result; // includes data:image/...;base64,
+  
+  fetch('http://localhost:5000/ocr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image: base64,
+      auto_detect: true,
+      include_boxes: true
+    })
+  })
+  .then(response => response.json())
+  .then(data => console.log(data));
+};
+reader.readAsDataURL(fileInput.files[0]);
+
+
+PYTHON (REQUESTS)
+-----------------
+import requests
+
+# File upload
+with open('image.png', 'rb') as f:
+    files = {'file': f}
+    data = {
+        'auto_detect': 'true',
+        'default_lang': 'ara',
+        'include_boxes': 'true'
+    }
+    response = requests.post('http://localhost:5000/ocr', files=files, data=data)
+    print(response.json())
+
+
+# Base64
+import base64
+
+with open('image.png', 'rb') as f:
+    img_base64 = base64.b64encode(f.read()).decode('utf-8')
+
+response = requests.post(
+    'http://localhost:5000/ocr',
+    json={
+        'image': f'data:image/png;base64,{img_base64}',
+        'auto_detect': True,
+        'default_lang': 'ara',
+        'include_boxes': True
+    }
+)
+result = response.json()
+print(f"Text: {result['text']}")
+print(f"Language: {result['language']}")
+print(f"Characters: {result['character_count']}")
+
+
+JAVA (OKHTTP)
+-------------
+// File upload
+OkHttpClient client = new OkHttpClient();
+
+RequestBody requestBody = new MultipartBody.Builder()
+    .setType(MultipartBody.FORM)
+    .addFormDataPart("file", "image.png",
+        RequestBody.create(new File("image.png"), 
+        MediaType.parse("image/png")))
+    .addFormDataPart("auto_detect", "true")
+    .addFormDataPart("include_boxes", "true")
+    .build();
+
+Request request = new Request.Builder()
+    .url("http://localhost:5000/ocr")
+    .post(requestBody)
+    .build();
+
+Response response = client.newCall(request).execute();
+String jsonData = response.body().string();
+
+
+KOTLIN (RETROFIT)
+------------------
+interface OcrApi {
+    @Multipart
+    @POST("/ocr")
+    suspend fun uploadImage(
+        @Part file: MultipartBody.Part,
+        @Part("auto_detect") autoDetect: RequestBody,
+        @Part("include_boxes") includeBoxes: RequestBody
+    ): OcrResponse
+    
+    @POST("/ocr")
+    suspend fun uploadBase64(
+        @Body request: Base64Request
+    ): OcrResponse
+}
+
+data class Base64Request(
+    val image: String,
+    val auto_detect: Boolean = true,
+    val default_lang: String = "ara",
+    val include_boxes: Boolean = true
+)
+
+data class OcrResponse(
+    val success: Boolean,
+    val text: String,
+    val language: String,
+    val character_count: Int,
+    val boxes: List<CharBox>?,
+    val output_file: String,
+    val input_file: String,
+    val timestamp: String
+)
+
+data class CharBox(
+    val char: String,
+    val x: Int,
+    val y: Int,
+    val width: Int,
+    val height: Int
+)
+
+================================================================================
+                        PERFORMANCE CONSIDERATIONS
+================================================================================
+
+Processing Time:
+----------------
+- Simple images (few characters): 1-3 seconds
+- Complex images (many characters): 3-10 seconds
+- Language detection adds: ~1-2 seconds
+- Character boxes extraction adds: ~0.5-1 second
+
+Recommendations:
+----------------
+1. Use auto_detect=false if you know the language (saves 1-2 seconds)
+2. Set include_boxes=false if you don't need character positions
+3. Preprocess images on client side for better quality:
+   - Crop to text region
+   - Increase contrast
+   - Remove background noise
+4. Use base64 method for mobile apps (no multipart handling)
+5. Implement timeout on client side (recommend 30 seconds)
+6. Handle network errors and retry logic
+
+Optimal Image Characteristics:
+-------------------------------
+- High contrast between text and background
+- Resolution: 300+ DPI for best results
+- Clear, non-blurry text
+- Minimal skew/rotation
+- Clean background without patterns
+
+================================================================================
+                        RELATED ENDPOINTS
+================================================================================
+
+GET /health
+-----------
+Check if server is running
+Response: {"status": "healthy", "message": "OCR Server is running"}
+
+
+GET /languages
+--------------
+Get supported languages
+Response: {
+  "supported_languages": {
+    "ar": "ara",
+    "en": "eng", 
+    "fr": "fra"
+  },
+  "default": "ara"
+}
+
+
+GET /outputs
+------------
+List all output text files
+Response: {
+  "count": 5,
+  "files": ["20251210_143022_image.txt", ...]
+}
+
+
+GET /output/<filename>
+----------------------
+Get content of specific output file
+Response: {
+  "filename": "20251210_143022_image.txt",
+  "content": "Language: ara\n..."
+}
+
+================================================================================
+                        TROUBLESHOOTING
+================================================================================
+
+Issue: "Failed to load image" error
+------------------------------------
+Solution:
+- Ensure image is not corrupted
+- Verify format is supported (png/jpg/jpeg/bmp/tiff)
+- Check base64 encoding is correct
+- Try different image
+
+
+Issue: No text detected (empty string)
+---------------------------------------
+Solution:
+- Image quality too low
+- Text too small or blurry
+- Wrong language selected
+- Try preprocessing image before sending
+
+
+Issue: Incorrect language detection
+------------------------------------
+Solution:
+- Set auto_detect=false
+- Specify correct language in default_lang parameter
+- Ensure image has enough text (3+ characters)
+
+
+Issue: Character boxes coordinates incorrect
+---------------------------------------------
+Solution:
+- Coordinates are in pixels from top-left corner
+- Verify you're using correct coordinate system
+- Check if image was resized on client side
+
+
+Issue: Request timeout
+----------------------
+Solution:
+- Image too large (resize before sending)
+- Server overloaded (implement queue system)
+- Increase client timeout value
+
+================================================================================
+                        SECURITY NOTES
+================================================================================
+
+1. File Upload Validation:
+   - Only allowed extensions accepted
+   - Filename sanitized with secure_filename()
+   - 16 MB size limit enforced
+
+2. Not Production-Ready Security:
+   - No authentication/authorization
+   - No rate limiting
+   - Debug mode enabled (shows stack traces)
+   - Runs on 0.0.0.0 (all interfaces)
+
+3. Recommendations for Production:
+   - Add API key authentication
+   - Implement rate limiting (e.g., Flask-Limiter)
+   - Disable debug mode
+   - Use HTTPS
+   - Add CORS configuration
+   - Implement file cleanup cron job
+   - Add request logging
+   - Validate base64 data size before decoding
+
+================================================================================
+                        VERSION INFORMATION
+================================================================================
+
+Server: Flask (Python)
+OCR Engine: Tesseract OCR
+Language Detection: langdetect
+Image Processing: OpenCV (cv2)
+Default Port: 5000
+Default Host: 0.0.0.0 (all interfaces)
+
+Required Tesseract Language Packs:
+- ara (Arabic)
+- eng (English)
+- fra (French)
+
+================================================================================
+                            END OF DOCUMENTATION
+================================================================================
+
+Last Updated: December 10, 2025
+Contact: Check repository for maintainer information
