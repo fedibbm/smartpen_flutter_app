@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({Key? key}) : super(key: key);
@@ -16,20 +17,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   final _notesController = TextEditingController();
   
   bool _isEditing = false;
-  String _selectedReadingLevel = 'Beginner';
-  String _selectedFontSize = 'Medium';
-  List<String> _selectedDifficulties = [];
-  
-  final List<String> _readingLevels = ['Beginner', 'Intermediate', 'Advanced'];
-  final List<String> _fontSizes = ['Small', 'Medium', 'Large', 'Extra Large'];
-  final List<String> _commonDifficulties = [
-    'Letter reversals (b/d, p/q)',
-    'Word recognition',
-    'Reading speed',
-    'Comprehension',
-    'Spelling',
-    'Writing organization',
-  ];
+  String _selectedReadingLevelKey = 'readingLevelBeginner';
+  String _selectedFontSizeKey = 'fontSizeMedium';
+  List<String> _selectedDifficultyKeys = [];
 
   @override
   void initState() {
@@ -38,15 +28,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _loadUserProfile() {
-    // Mock loading user data - in a real app, this would come from a database
     _nameController.text = 'sami ben salah';
     _ageController.text = '16';
     _emailController.text = 'bensalah.sami@email.com';
     _schoolController.text = 'Lycée 18 janvier';
     _notesController.text = 'Works best with simplified text and audio support.';
-    _selectedReadingLevel = 'Intermediate';
-    _selectedFontSize = 'Large';
-    _selectedDifficulties = ['Letter reversals (b/d, p/q)', 'Reading speed'];
+    _selectedReadingLevelKey = 'readingLevelIntermediate';
+    _selectedFontSizeKey = 'fontSizeLarge';
+    _selectedDifficultyKeys = ['difficultyLetterReversals', 'difficultyReadingSpeed'];
   }
 
   @override
@@ -61,9 +50,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final readingLevelKeys = ['readingLevelBeginner', 'readingLevelIntermediate', 'readingLevelAdvanced'];
+    final fontSizeKeys = ['fontSizeSmall', 'fontSizeMedium', 'fontSizeLarge', 'fontSizeExtraLarge'];
+    final difficultyKeys = [
+      'difficultyLetterReversals',
+      'difficultyWordRecognition',
+      'difficultyReadingSpeed',
+      'difficultyComprehension',
+      'difficultySpelling',
+      'difficultyWritingOrg',
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Profile'),
+        title: Text(context.tr('userProfile')),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -78,7 +78,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               });
             },
             icon: Icon(_isEditing ? Icons.save : Icons.edit),
-            tooltip: _isEditing ? 'Save Changes' : 'Edit Profile',
+            tooltip: _isEditing ? context.tr('saveChanges') : context.tr('editProfile'),
           ),
         ],
       ),
@@ -89,7 +89,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Header
               Center(
                 child: Column(
                   children: [
@@ -116,8 +115,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               child: IconButton(
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Photo selection feature coming soon!'),
+                                    SnackBar(
+                                      content: Text(context.tr('photoSelectionComingSoon')),
                                     ),
                                   );
                                 },
@@ -133,7 +132,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      _nameController.text.isEmpty ? 'User Name' : _nameController.text,
+                      _nameController.text.isEmpty ? context.tr('userName') : _nameController.text,
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -145,96 +144,99 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               
               const SizedBox(height: 32),
               
-              // Personal Information
               _buildSectionCard(
-                title: 'Personal Information',
+                title: context.tr('personalInformation'),
                 icon: Icons.person_outline,
                 children: [
                   _buildTextField(
                     controller: _nameController,
-                    label: 'Full Name',
+                    label: context.tr('fullName'),
                     icon: Icons.person,
                     enabled: _isEditing,
+                    context: context,
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _ageController,
-                    label: 'Age',
+                    label: context.tr('age'),
                     icon: Icons.cake,
                     keyboardType: TextInputType.number,
                     enabled: _isEditing,
+                    context: context,
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _emailController,
-                    label: 'Email',
+                    label: context.tr('email'),
                     icon: Icons.email,
                     keyboardType: TextInputType.emailAddress,
                     enabled: _isEditing,
+                    context: context,
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _schoolController,
-                    label: 'School/Institution',
+                    label: context.tr('schoolInstitution'),
                     icon: Icons.school,
                     enabled: _isEditing,
+                    context: context,
                   ),
                 ],
               ),
               
               const SizedBox(height: 24),
               
-              // Reading Preferences
               _buildSectionCard(
-                title: 'Reading Preferences',
+                title: context.tr('readingPreferences'),
                 icon: Icons.auto_stories,
                 children: [
                   _buildDropdownField(
-                    label: 'Reading Level',
-                    value: _selectedReadingLevel,
-                    items: _readingLevels,
+                    label: context.tr('readingLevel'),
+                    value: _selectedReadingLevelKey,
+                    items: readingLevelKeys,
                     onChanged: _isEditing ? (value) {
                       setState(() {
-                        _selectedReadingLevel = value!;
+                        _selectedReadingLevelKey = value!;
                       });
                     } : null,
+                    context: context,
                   ),
                   const SizedBox(height: 16),
                   _buildDropdownField(
-                    label: 'Preferred Font Size',
-                    value: _selectedFontSize,
-                    items: _fontSizes,
+                    label: context.tr('preferredFontSize'),
+                    value: _selectedFontSizeKey,
+                    items: fontSizeKeys,
                     onChanged: _isEditing ? (value) {
                       setState(() {
-                        _selectedFontSize = value!;
+                        _selectedFontSizeKey = value!;
                       });
                     } : null,
+                    context: context,
                   ),
                 ],
               ),
               
               const SizedBox(height: 24),
               
-              // Learning Difficulties
               _buildSectionCard(
-                title: 'Learning Challenges',
+                title: context.tr('learningChallenges'),
                 icon: Icons.psychology,
                 children: [
-                  const Text(
-                    'Select the areas you find challenging:',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  Text(
+                    context.tr('selectChallengingAreas'),
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                   const SizedBox(height: 12),
-                  ..._commonDifficulties.map((difficulty) {
+                  ...difficultyKeys.map((difficultyKey) {
                     return CheckboxListTile(
-                      title: Text(difficulty),
-                      value: _selectedDifficulties.contains(difficulty),
+                      title: Text(context.tr(difficultyKey)),
+                      value: _selectedDifficultyKeys.contains(difficultyKey),
                       onChanged: _isEditing ? (bool? value) {
                         setState(() {
                           if (value == true) {
-                            _selectedDifficulties.add(difficulty);
+                            _selectedDifficultyKeys.add(difficultyKey);
                           } else {
-                            _selectedDifficulties.remove(difficulty);
+                            _selectedDifficultyKeys.remove(difficultyKey);
                           }
                         });
                       } : null,
@@ -246,24 +248,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               
               const SizedBox(height: 24),
               
-              // Additional Notes
               _buildSectionCard(
-                title: 'Additional Notes',
+                title: context.tr('additionalNotes'),
                 icon: Icons.note_outlined,
                 children: [
                   _buildTextField(
                     controller: _notesController,
-                    label: 'Notes about learning preferences, strategies that work, etc.',
+                    label: context.tr('notesHint'),
                     icon: Icons.note,
                     maxLines: 4,
                     enabled: _isEditing,
+                    context: context,
                   ),
                 ],
               ),
               
               const SizedBox(height: 32),
               
-              // Action Buttons
               if (_isEditing) ...[
                 Row(
                   children: [
@@ -272,10 +273,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         onPressed: () {
                           setState(() {
                             _isEditing = false;
-                            _loadUserProfile(); // Reset to original values
+                            _loadUserProfile();
                           });
                         },
-                        child: const Text('Cancel'),
+                        child: Text(context.tr('cancel')),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -286,7 +287,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Save Changes'),
+                        child: Text(context.tr('saveChanges')),
                       ),
                     ),
                   ],
@@ -301,7 +302,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       });
                     },
                     icon: const Icon(Icons.edit),
-                    label: const Text('Edit Profile'),
+                    label: Text(context.tr('editProfile')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -355,6 +356,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required TextEditingController controller,
     required String label,
     required IconData icon,
+    required BuildContext context,
     TextInputType? keyboardType,
     int maxLines = 1,
     bool enabled = true,
@@ -375,7 +377,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'This field is required';
+          return context.tr('thisFieldIsRequired');
         }
         return null;
       },
@@ -386,6 +388,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required String label,
     required String value,
     required List<String> items,
+    required BuildContext context,
     ValueChanged<String?>? onChanged,
   }) {
     return DropdownButtonFormField<String>(
@@ -401,7 +404,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       items: items.map((String item) {
         return DropdownMenuItem<String>(
           value: item,
-          child: Text(item),
+          child: Text(context.tr(item)),
         );
       }).toList(),
       onChanged: onChanged,
@@ -410,10 +413,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   void _saveProfile() {
     if (_formKey.currentState?.validate() ?? false) {
-      // Mock saving - in a real app, this would save to a database
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile saved successfully!'),
+        SnackBar(
+          content: Text(context.tr('profileSaved')),
           backgroundColor: Colors.green,
         ),
       );

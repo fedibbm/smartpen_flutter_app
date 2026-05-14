@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/smart_pen_provider.dart';
 import '../models/smart_pen_models.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
 
 class ScanHistoryScreen extends StatelessWidget {
   const ScanHistoryScreen({Key? key}) : super(key: key);
@@ -12,7 +13,7 @@ class ScanHistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan History'),
+        title: Text(context.tr('scanHistory')),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
@@ -22,21 +23,21 @@ class ScanHistoryScreen extends StatelessWidget {
               
               return IconButton(
                 icon: const Icon(Icons.delete_sweep),
-                tooltip: 'Clear All History',
+                tooltip: context.tr('clearAllHistory'),
                 onPressed: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: const Text('Clear History'),
-                      content: const Text('Are you sure you want to clear all scan history?'),
+                      title: Text(context.tr('clearHistory')),
+                      content: Text(context.tr('clearHistoryConfirm')),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
+                          child: Text(context.tr('cancel')),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Clear', style: TextStyle(color: Colors.red)),
+                          child: Text(context.tr('delete'), style: const TextStyle(color: Colors.red)),
                         ),
                       ],
                     ),
@@ -46,7 +47,7 @@ class ScanHistoryScreen extends StatelessWidget {
                     provider.clearRecognizedTexts();
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('History cleared')),
+                        SnackBar(content: Text(context.tr('historyCleared'))),
                       );
                     }
                   }
@@ -70,7 +71,7 @@ class ScanHistoryScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No scan history yet',
+                    context.tr('noScanHistory'),
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.grey.shade600,
@@ -79,7 +80,7 @@ class ScanHistoryScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Start scanning to see your history here',
+                    context.tr('startScanningToSee'),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade500,
@@ -108,7 +109,7 @@ class ScanHistoryScreen extends StatelessWidget {
 
   Widget _buildHistoryCard(BuildContext context, RecognizedText text, int index) {
     final dateFormat = DateFormat('MMM dd, yyyy • hh:mm a');
-    final timeAgo = _getTimeAgo(text.timestamp);
+    final timeAgo = _getTimeAgo(context, text.timestamp);
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -162,7 +163,7 @@ class ScanHistoryScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '${(text.confidence * 100).toStringAsFixed(0)}% confidence',
+                    '${(text.confidence * 100).toStringAsFixed(0)}% ${context.tr('confidence')}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -215,7 +216,7 @@ class ScanHistoryScreen extends StatelessWidget {
                     Chip(
                       avatar: Icon(Icons.text_fields, size: 16, color: Colors.green.shade700),
                       label: Text(
-                        '${text.originalText.split(' ').length} words',
+                          '${text.originalText.split(' ').length} ${context.tr('words')}',
                         style: const TextStyle(fontSize: 12),
                       ),
                       backgroundColor: Colors.green.shade50,
@@ -223,7 +224,7 @@ class ScanHistoryScreen extends StatelessWidget {
                     Chip(
                       avatar: Icon(Icons.abc, size: 16, color: Colors.purple.shade700),
                       label: Text(
-                        '${text.originalText.length} characters',
+                          '${text.originalText.length} ${context.tr('characters')}',
                         style: const TextStyle(fontSize: 12),
                       ),
                       backgroundColor: Colors.purple.shade50,
@@ -241,24 +242,23 @@ class ScanHistoryScreen extends StatelessWidget {
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: text.originalText));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Copied to clipboard')),
+                            SnackBar(content: Text(context.tr('copiedToClipboard'))),
                           );
                         },
                         icon: const Icon(Icons.copy, size: 18),
-                        label: const Text('Copy'),
+                        label: Text(context.tr('copy')),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          // Share functionality could be added here
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Share feature coming soon')),
+                            SnackBar(content: Text(context.tr('shareFeatureComingSoon'))),
                           );
                         },
                         icon: const Icon(Icons.share, size: 18),
-                        label: const Text('Share'),
+                        label: Text(context.tr('share')),
                       ),
                     ),
                   ],
@@ -271,18 +271,18 @@ class ScanHistoryScreen extends StatelessWidget {
     );
   }
 
-  String _getTimeAgo(DateTime timestamp) {
+  String _getTimeAgo(BuildContext context, DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
     
     if (difference.inSeconds < 60) {
-      return 'Just now';
+      return context.tr('justNow');
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
+      return '${difference.inMinutes}${context.tr('minutesAgo')}';
     } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
+      return '${difference.inHours}${context.tr('hoursAgo')}';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+      return '${difference.inDays}${context.tr('daysAgo')}';
     } else {
       return DateFormat('MMM dd, yyyy').format(timestamp);
     }

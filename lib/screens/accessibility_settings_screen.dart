@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/smart_pen_provider.dart';
+import '../providers/locale_provider.dart';
+import '../providers/notification_provider.dart';
 import '../services/text_to_speech_service.dart';
+import '../l10n/app_localizations.dart';
 
 class AccessibilitySettingsScreen extends StatefulWidget {
   const AccessibilitySettingsScreen({Key? key}) : super(key: key);
@@ -17,11 +20,29 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
   bool _showDefinitions = true;
   bool _highlightKeywords = true;
 
+  Widget _buildLangButton(LocaleProvider provider, String code, String label) {
+    final isActive = provider.locale == code;
+    return Expanded(
+      child: ElevatedButton(
+        onPressed: () => provider.setLocale(code),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isActive ? Colors.indigo : Colors.grey.shade200,
+          foregroundColor: isActive ? Colors.white : Colors.black87,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accessibility Settings'),
+        title: Text(context.tr('accessibilitySettings')),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -41,7 +62,7 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       Icon(Icons.visibility, color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 8),
                       Text(
-                        'Visual Accessibility',
+                        context.tr('visualAccessibility'),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -53,8 +74,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                   const SizedBox(height: 16),
                   
                   SwitchListTile(
-                    title: const Text('High Contrast Mode'),
-                    subtitle: const Text('Increase contrast for better readability'),
+                    title: Text(context.tr('highContrastMode')),
+                    subtitle: Text(context.tr('highContrastSubtitle')),
                     value: _highContrastMode,
                     onChanged: (value) {
                       setState(() {
@@ -64,8 +85,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                   ),
                   
                   SwitchListTile(
-                    title: const Text('Large Font Size'),
-                    subtitle: const Text('Use larger text throughout the app'),
+                    title: Text(context.tr('largeFontSize')),
+                    subtitle: Text(context.tr('largeFontSubtitle')),
                     value: _largeFontSize,
                     onChanged: (value) {
                       setState(() {
@@ -76,6 +97,53 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                 ],
               ),
             ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // App Language
+          Consumer<LocaleProvider>(
+            builder: (context, localeProvider, child) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.language, color: Colors.indigo.shade700),
+                          const SizedBox(width: 8),
+                          Text(
+                            context.tr('appLanguage'),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.indigo.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        context.tr('appLanguageSubtitle'),
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _buildLangButton(localeProvider, 'en', '🇬🇧 ${context.tr('english')}'),
+                          const SizedBox(width: 8),
+                          _buildLangButton(localeProvider, 'fr', '🇫🇷 ${context.tr('french')}'),
+                          const SizedBox(width: 8),
+                          _buildLangButton(localeProvider, 'ar', '🇸🇦 ${context.tr('arabic')}'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           
           const SizedBox(height: 16),
@@ -92,7 +160,7 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       Icon(Icons.auto_stories, color: Colors.green.shade700),
                       const SizedBox(width: 8),
                       Text(
-                        'Reading Assistance',
+                        context.tr('readingAssistance'),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -104,8 +172,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                   const SizedBox(height: 16),
                   
                   SwitchListTile(
-                    title: const Text('Auto-Simplify Text'),
-                    subtitle: const Text('Automatically show simplified versions of complex text'),
+                    title: Text(context.tr('autoSimplifyText')),
+                    subtitle: Text(context.tr('autoSimplifySubtitle')),
                     value: _autoSimplifyText,
                     onChanged: (value) {
                       setState(() {
@@ -115,8 +183,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                   ),
                   
                   SwitchListTile(
-                    title: const Text('Show Definitions'),
-                    subtitle: const Text('Display word definitions automatically'),
+                    title: Text(context.tr('showDefinitions')),
+                    subtitle: Text(context.tr('showDefinitionsSubtitle')),
                     value: _showDefinitions,
                     onChanged: (value) {
                       setState(() {
@@ -126,8 +194,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                   ),
                   
                   SwitchListTile(
-                    title: const Text('Highlight Keywords'),
-                    subtitle: const Text('Emphasize important words in text'),
+                    title: Text(context.tr('highlightKeywords')),
+                    subtitle: Text(context.tr('highlightKeywordsSubtitle')),
                     value: _highlightKeywords,
                     onChanged: (value) {
                       setState(() {
@@ -156,7 +224,7 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           Icon(Icons.camera_alt, color: Colors.orange.shade700),
                           const SizedBox(width: 8),
                           Text(
-                            'Camera Mode',
+                            context.tr('cameraMode'),
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -169,8 +237,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       
                       // Camera mode selection
                       RadioListTile<CameraMode>(
-                        title: const Text('ESP32-CAM (Smart Pen)'),
-                        subtitle: const Text('Connect smart pen for text scanning'),
+                        title: Text(context.tr('esp32Cam')),
+                        subtitle: Text(context.tr('esp32CamSubtitle')),
                         value: CameraMode.esp32,
                         groupValue: provider.cameraMode,
                         onChanged: (value) {
@@ -181,11 +249,11 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       ),
                       
                       RadioListTile<CameraMode>(
-                        title: const Text('Phone Camera'),
+                        title: Text(context.tr('phoneCamera')),
                         subtitle: Text(
                           provider.phoneCameraInitialized 
-                              ? '✓ Ready' 
-                              : 'Tap to initialize',
+                              ? context.tr('ready') 
+                              : context.tr('tapToInitialize'),
                           style: TextStyle(
                             color: provider.phoneCameraInitialized 
                                 ? Colors.green 
@@ -237,7 +305,7 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       
                       const SizedBox(height: 8),
                       Text(
-                        'Select how you want to capture text for recognition.',
+                        context.tr('cameraModeDescription'),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -266,7 +334,7 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
                           const SizedBox(width: 8),
                           Text(
-                            'Text-to-Speech',
+                            context.tr('textToSpeech'),
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -279,8 +347,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       
                       // Enable/Disable TTS
                       SwitchListTile(
-                        title: const Text('Enable Text-to-Speech'),
-                        subtitle: const Text('Read text aloud when recognized'),
+                        title: Text(context.tr('enableTts')),
+                        subtitle: Text(context.tr('enableTtsSubtitle')),
                         value: provider.ttsEnabled,
                         onChanged: (value) {
                           provider.toggleTtsEnabled();
@@ -289,8 +357,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       
                       // Auto-play toggle
                       SwitchListTile(
-                        title: const Text('Auto-Play'),
-                        subtitle: const Text('Automatically read new text'),
+                        title: Text(context.tr('autoPlay')),
+                        subtitle: Text(context.tr('autoPlaySubtitle')),
                         value: provider.ttsAutoPlay,
                         onChanged: provider.ttsEnabled
                             ? (value) {
@@ -309,9 +377,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           children: [
                             const Icon(Icons.language, size: 20),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Language',
-                              style: TextStyle(
+                            Text(
+                              context.tr('language'),
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -326,18 +394,18 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                                       }
                                     }
                                   : null,
-                              items: const [
+                              items: [
                                 DropdownMenuItem(
                                   value: 'en',
-                                  child: Text('🇬🇧 English'),
+                                  child: Text('🇬🇧 ${context.tr('english')}'),
                                 ),
                                 DropdownMenuItem(
                                   value: 'fr',
-                                  child: Text('🇫🇷 French'),
+                                  child: Text('🇫🇷 ${context.tr('french')}'),
                                 ),
                                 DropdownMenuItem(
                                   value: 'ar',
-                                  child: Text('🇸🇦 Arabic'),
+                                  child: Text('🇸🇦 ${context.tr('arabic')}'),
                                 ),
                               ],
                             ),
@@ -355,9 +423,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           children: [
                             const Icon(Icons.speed, size: 20),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Speed',
-                              style: TextStyle(
+                            Text(
+                              context.tr('speed'),
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -391,9 +459,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           children: [
                             const Icon(Icons.graphic_eq, size: 20),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Pitch',
-                              style: TextStyle(
+                            Text(
+                              context.tr('pitch'),
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -427,9 +495,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           children: [
                             const Icon(Icons.volume_down, size: 20),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Volume',
-                              style: TextStyle(
+                            Text(
+                              context.tr('volume'),
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -463,9 +531,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           onPressed: provider.ttsEnabled
                               ? () async {
                                   final testText = {
-                                    'en': 'Hello! This is a test of the text-to-speech feature.',
-                                    'fr': 'Bonjour! Ceci est un test de la synthèse vocale.',
-                                    'ar': 'مرحباً! هذا اختبار لميزة تحويل النص إلى كلام.',
+                                    'en': context.tr('ttsTestEn'),
+                                    'fr': context.tr('ttsTestFr'),
+                                    'ar': context.tr('ttsTestAr'),
                                   };
                                   
                                   await provider.speakText(
@@ -480,8 +548,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                           ),
                           label: Text(
                             provider.ttsState == TtsState.playing
-                                ? 'Stop Test'
-                                : 'Test Voice',
+                                ? context.tr('stopTest')
+                                : context.tr('testVoice'),
                           ),
                         ),
                       ),
@@ -494,76 +562,70 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
           
           const SizedBox(height: 16),
           
-          // Parent Notification Preferences
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+          // Notification Preferences
+          Consumer<NotificationProvider>(
+            builder: (context, notifProvider, child) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.notifications_active, color: Colors.purple.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Parent Notifications',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.purple.shade700,
-                        ),
+                      Row(
+                        children: [
+                          Icon(Icons.notifications_active, color: Colors.purple.shade700),
+                          const SizedBox(width: 8),
+                          Text(
+                            context.tr('parentNotifications'),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      SwitchListTile(
+                        title: Text(context.tr('sessionInterruptions')),
+                        subtitle: Text(context.tr('sessionInterruptionsSubtitle')),
+                        value: notifProvider.sessionInterruptions,
+                        onChanged: (value) => notifProvider.setSessionInterruptions(value),
+                      ),
+                      
+                      SwitchListTile(
+                        title: Text(context.tr('dailyProgressReports')),
+                        subtitle: Text(context.tr('dailyProgressSubtitle')),
+                        value: notifProvider.dailyProgressReports,
+                        onChanged: (value) => notifProvider.setDailyProgressReports(value),
+                      ),
+                      
+                      SwitchListTile(
+                        title: Text(context.tr('weeklySummaries')),
+                        subtitle: Text(context.tr('weeklySummariesSubtitle')),
+                        value: notifProvider.weeklySummaries,
+                        onChanged: (value) => notifProvider.setWeeklySummaries(value),
+                      ),
+                      
+                      SwitchListTile(
+                        title: Text(context.tr('milestoneAchievements')),
+                        subtitle: Text(context.tr('milestoneAchievementsSubtitle')),
+                        value: notifProvider.milestoneAchievements,
+                        onChanged: (value) => notifProvider.setMilestoneAchievements(value),
+                      ),
+                      
+                      SwitchListTile(
+                        title: Text(context.tr('lowEngagementAlerts')),
+                        subtitle: Text(context.tr('lowEngagementSubtitle')),
+                        value: notifProvider.lowEngagementAlerts,
+                        onChanged: (value) => notifProvider.setLowEngagementAlerts(value),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  
-                  SwitchListTile(
-                    title: const Text('Session Interruptions'),
-                    subtitle: const Text('Alert when reading session is interrupted'),
-                    value: true,
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                  ),
-                  
-                  SwitchListTile(
-                    title: const Text('Daily Progress Reports'),
-                    subtitle: const Text('Receive daily reading activity summary'),
-                    value: true,
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                  ),
-                  
-                  SwitchListTile(
-                    title: const Text('Weekly Summaries'),
-                    subtitle: const Text('Get weekly progress and achievement updates'),
-                    value: true,
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                  ),
-                  
-                  SwitchListTile(
-                    title: const Text('Milestone Achievements'),
-                    subtitle: const Text('Notify when learning milestones are reached'),
-                    value: false,
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                  ),
-                  
-                  SwitchListTile(
-                    title: const Text('Low Engagement Alerts'),
-                    subtitle: const Text('Alert if app hasn\'t been used recently'),
-                    value: false,
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
           
           const SizedBox(height: 16),
@@ -580,7 +642,7 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                       Icon(Icons.help, color: Colors.orange.shade700),
                       const SizedBox(width: 8),
                       Text(
-                        'Support',
+                        context.tr('support'),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -591,9 +653,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                   ),
                   const SizedBox(height: 16),
                   
-                  const Text(
-                    'DyslexiPen Reader is designed to help users with dyslexia and reading difficulties. These settings can be adjusted to provide the best reading experience.',
-                    style: TextStyle(fontSize: 14, height: 1.5),
+                  Text(
+                    context.tr('supportDescription'),
+                    style: const TextStyle(fontSize: 14, height: 1.5),
                   ),
                   
                   const SizedBox(height: 16),
@@ -604,13 +666,13 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                         child: OutlinedButton.icon(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Opening tutorial...'),
+                              SnackBar(
+                                content: Text(context.tr('openingTutorial')),
                               ),
                             );
                           },
                           icon: const Icon(Icons.school),
-                          label: const Text('Tutorial'),
+                          label: Text(context.tr('tutorial')),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -618,13 +680,13 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                         child: OutlinedButton.icon(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Opening help center...'),
+                              SnackBar(
+                                content: Text(context.tr('openingHelpCenter')),
                               ),
                             );
                           },
                           icon: const Icon(Icons.support),
-                          label: const Text('Help'),
+                          label: Text(context.tr('help')),
                         ),
                       ),
                     ],
@@ -642,8 +704,8 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
             child: ElevatedButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings saved successfully!'),
+                  SnackBar(
+                    content: Text(context.tr('settingsSaved')),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -654,9 +716,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text(
-                'Save Settings',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              child: Text(
+                context.tr('saveSettings'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -671,12 +733,12 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
+                    title: Text(context.tr('logout')),
+                    content: Text(context.tr('logoutConfirm')),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
+                        child: Text(context.tr('cancel')),
                       ),
                       TextButton(
                         onPressed: () {
@@ -686,9 +748,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                             (route) => false,
                           );
                         },
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(color: Colors.red),
+                        child: Text(
+                          context.tr('logout'),
+                          style: const TextStyle(color: Colors.red),
                         ),
                       ),
                     ],
@@ -701,9 +763,9 @@ class _AccessibilitySettingsScreenState extends State<AccessibilitySettingsScree
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               icon: const Icon(Icons.logout),
-              label: const Text(
-                'Logout',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              label: Text(
+                context.tr('logout'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),

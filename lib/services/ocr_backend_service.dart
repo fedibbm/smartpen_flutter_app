@@ -106,9 +106,12 @@ class OcrBackendService {
       throw OcrException('No frames provided', 400);
     }
 
-    if (frames.length == 1) {
+    // Create defensive copy to prevent concurrent modification
+    final framesCopy = List<Uint8List>.from(frames);
+
+    if (framesCopy.length == 1) {
       // Single frame, use regular OCR endpoint
-      return await processImage(frames.first);
+      return await processImage(framesCopy.first);
     }
 
     try {
@@ -118,15 +121,20 @@ class OcrBackendService {
       );
 
       // Add each frame with sequential field names (file0, file1, file2, ...)
-      for (int i = 0; i < frames.length; i++) {
+      for (int i = 0; i < framesCopy.length; i++) {
         request.files.add(
           http.MultipartFile.fromBytes(
             'file$i',
-            frames[i],
+            framesCopy[i],
             filename: 'frame_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
           ),
         );
       }
+      
+      // Use segmentation mode by default (avoids LAPACK errors with stitching)
+      request.fields['use_segmentation'] = 'true';
+      request.fields['auto_detect'] = 'true';
+      request.fields['default_lang'] = 'eng';
 
       final streamedResponse = await request.send().timeout(
         NetworkConfig.readTimeout,
@@ -192,6 +200,12 @@ class OcrResponse {
   final String? error;
   final DateTime timestamp;
   final Map<String, dynamic>? metadata;
+  final int? frameId;
+  final List<Map<String, dynamic>>? regions;
+  final String? processingMode;
+  final int? totalRegionsDetected;
+  final int? uniqueRegions;
+  final int? duplicatesSuppressed;
 
   OcrResponse({
     required this.extractedText,
@@ -200,6 +214,12 @@ class OcrResponse {
     this.error,
     required this.timestamp,
     this.metadata,
+    this.frameId,
+    this.regions,
+    this.processingMode,
+    this.totalRegionsDetected,
+    this.uniqueRegions,
+    this.duplicatesSuppressed,
   });
 
   factory OcrResponse.fromJson(Map<String, dynamic> json) {
@@ -212,6 +232,14 @@ class OcrResponse {
           ? DateTime.parse(json['timestamp'])
           : DateTime.now(),
       metadata: json['metadata'],
+      frameId: json['frame_id'],
+      regions: json['regions'] != null 
+          ? List<Map<String, dynamic>>.from(json['regions'])
+          : null,
+      processingMode: json['processing_mode'],
+      totalRegionsDetected: json['total_regions_detected'],
+      uniqueRegions: json['unique_regions'],
+      duplicatesSuppressed: json['duplicates_suppressed'],
     );
   }
 
@@ -259,6 +287,7 @@ class OcrResponse {
       confidence: confidence,
       timestamp: timestamp,
       definitions: _generateDefinitions(keywords),
+      language: 'en', // TODO: Replace with actual language detection if available
     );
   }
 

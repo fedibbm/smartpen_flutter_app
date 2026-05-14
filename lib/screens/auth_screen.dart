@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'email_verification_screen.dart';
+import '../services/user_preferences_service.dart';
+import '../l10n/app_localizations.dart';
 
 /// Login/Signup screen shown after onboarding
 class AuthScreen extends StatefulWidget {
@@ -39,25 +41,76 @@ class _AuthScreenState extends State<AuthScreen> {
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
+        final prefs = await SharedPreferences.getInstance();
+        
         if (_isLogin) {
-          // Login - go directly to home
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('is_logged_in', true);
-          await prefs.setString('user_email', _emailController.text);
-          Navigator.of(context).pushReplacementNamed('/home');
+          // Login - check if user exists
+          final savedEmail = prefs.getString('user_email');
+          final savedPassword = prefs.getString('user_password');
+          
+          if (savedEmail == _emailController.text && 
+              savedPassword == _passwordController.text) {
+            // Login successful
+            await prefs.setBool('is_logged_in', true);
+            Navigator.of(context).pushReplacementNamed('/home');
+          } else {
+            // Login failed
+            setState(() {
+              _isLoading = false;
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.tr('invalidEmailPassword')),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
         } else {
-          // Sign up - go to email verification
-          setState(() {
-            _isLoading = false;
-          });
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => EmailVerificationScreen(
-                email: _emailController.text,
-                name: _nameController.text,
-              ),
-            ),
-          );
+          // Sign up - check if email already exists
+          final savedEmail = prefs.getString('user_email');
+          
+          if (savedEmail == _emailController.text) {
+            // Email already registered
+            setState(() {
+              _isLoading = false;
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.tr('emailAlreadyRegistered')),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          } else {
+            // Sign up successful - save credentials and user profile
+            await prefs.setString('user_email', _emailController.text);
+            await prefs.setString('user_password', _passwordController.text);
+            await prefs.setString('user_name', _nameController.text);
+            await prefs.setBool('is_logged_in', true);
+            
+            // Save parent email for notifications
+            final userPrefs = UserPreferencesService();
+            await userPrefs.saveChildName(_nameController.text);
+            await userPrefs.saveParentEmail(_parentEmailController.text);
+            
+            setState(() {
+              _isLoading = false;
+            });
+            
+            // Show success message and go to home
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.tr('accountCreated')),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              Navigator.of(context).pushReplacementNamed('/home');
+            }
+          }
         }
       }
     }
@@ -115,7 +168,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   // Title
                   Text(
-                    _isLogin ? 'Welcome Back!' : 'Create Account',
+                    _isLogin ? context.tr('welcomeBack') : context.tr('createAccount'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 24,
@@ -128,8 +181,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   Text(
                     _isLogin
-                        ? 'Sign in to continue'
-                        : 'Start your reading journey',
+                        ? context.tr('signInToContinue')
+                        : context.tr('startReadingJourney'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -144,7 +197,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     TextFormField(
                       controller: _nameController,
                       decoration: InputDecoration(
-                        labelText: 'Full Name',
+                        labelText: context.tr('fullName'),
                         prefixIcon: const Icon(Icons.person_outline),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -154,7 +207,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       validator: (value) {
                         if (!_isLogin && (value == null || value.isEmpty)) {
-                          return 'Please enter your name';
+                          return context.tr('pleaseEnterName');
                         }
                         return null;
                       },
@@ -167,8 +220,8 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
+                        labelText: context.tr('email'),
+                        prefixIcon: const Icon(Icons.email_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -177,10 +230,10 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return context.tr('pleaseEnterEmail');
                       }
                       if (!value.contains('@')) {
-                        return 'Please enter a valid email';
+                        return context.tr('validEmailRequired');
                       }
                       return null;
                     },
@@ -194,22 +247,22 @@ class _AuthScreenState extends State<AuthScreen> {
                       controller: _parentEmailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        labelText: 'Parent/Guardian Email',
+                        labelText: context.tr('parentEmail'),
                         prefixIcon: const Icon(Icons.supervisor_account),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
                         fillColor: Colors.grey[50],
-                        helperText: 'Receive progress updates and notifications',
+                        helperText: context.tr('parentEmailHelper'),
                         helperMaxLines: 2,
                       ),
                       validator: (value) {
                         if (!_isLogin && (value == null || value.isEmpty)) {
-                          return 'Please enter parent email';
+                          return context.tr('pleaseEnterEmail');
                         }
                         if (!_isLogin && !value!.contains('@')) {
-                          return 'Please enter a valid email';
+                          return context.tr('validEmailRequired');
                         }
                         return null;
                       },
@@ -222,7 +275,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                        labelText: context.tr('password'),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -244,10 +297,10 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
+                        return context.tr('pleaseEnterPassword');
                       }
                       if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return context.tr('passwordMinLength');
                       }
                       return null;
                     },
@@ -261,13 +314,13 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: TextButton(
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Password reset coming soon!'),
+                            SnackBar(
+                              content: Text(context.tr('passwordResetComingSoon')),
                             ),
                           );
                         },
                         child: Text(
-                          'Forgot Password?',
+                          context.tr('forgotPassword'),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                           ),
@@ -301,7 +354,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                             )
                           : Text(
-                              _isLogin ? 'Sign In' : 'Sign Up',
+                              _isLogin ? context.tr('signIn') : context.tr('signUp'),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -319,7 +372,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
-                          'OR',
+                          context.tr('or'),
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontWeight: FontWeight.w500,
@@ -336,14 +389,14 @@ class _AuthScreenState extends State<AuthScreen> {
                   OutlinedButton.icon(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Google Sign In coming soon!'),
+                        SnackBar(
+                          content: Text(context.tr('googleSignInComingSoon')),
                         ),
                       );
                     },
                     icon: Icon(Icons.g_mobiledata, color: Colors.grey[700]),
                     label: Text(
-                      'Continue with Google',
+                      context.tr('continueWithGoogle'),
                       style: TextStyle(color: Colors.grey[700]),
                     ),
                     style: OutlinedButton.styleFrom(
@@ -360,14 +413,14 @@ class _AuthScreenState extends State<AuthScreen> {
                   OutlinedButton.icon(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Facebook Sign In coming soon!'),
+                        SnackBar(
+                          content: Text(context.tr('facebookSignInComingSoon')),
                         ),
                       );
                     },
                     icon: Icon(Icons.facebook, color: Colors.grey[700]),
                     label: Text(
-                      'Continue with Facebook',
+                      context.tr('continueWithFacebook'),
                       style: TextStyle(color: Colors.grey[700]),
                     ),
                     style: OutlinedButton.styleFrom(
@@ -387,14 +440,14 @@ class _AuthScreenState extends State<AuthScreen> {
                     children: [
                       Text(
                         _isLogin
-                            ? "Don't have an account? "
-                            : 'Already have an account? ',
+                            ? context.tr('dontHaveAccount')
+                            : context.tr('alreadyHaveAccount'),
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       TextButton(
                         onPressed: _toggleAuthMode,
                         child: Text(
-                          _isLogin ? 'Sign Up' : 'Sign In',
+                          _isLogin ? context.tr('signUp') : context.tr('signIn'),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
@@ -416,7 +469,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       }
                     },
                     child: Text(
-                      'Skip for now',
+                      context.tr('skipForNow'),
                       style: TextStyle(
                         color: Colors.grey[600],
                         decoration: TextDecoration.underline,

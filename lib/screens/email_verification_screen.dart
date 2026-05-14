@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/app_localizations.dart';
 
 /// Email verification screen shown after sign up
 class EmailVerificationScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Verification code sent!'),
+          content: Text(context.tr('codeSent')),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
         ),
@@ -111,7 +112,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
                   // Title
                   Text(
-                    'Verify Your Email',
+                    context.tr('verifyYourEmail'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 28,
@@ -124,7 +125,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
                   // Description
                   Text(
-                    'We sent a verification code to',
+                    context.tr('verificationSent'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
@@ -148,8 +149,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   TextFormField(
                     controller: _codeController,
                     decoration: InputDecoration(
-                      labelText: 'Verification Code',
-                      hintText: 'Enter 6-digit code',
+                      labelText: context.tr('verificationCode'),
+                      hintText: context.tr('enter6DigitCode'),
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -166,10 +167,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     maxLength: 6,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter the verification code';
+                        return context.tr('enterVerificationCode');
                       }
                       if (value.length != 6) {
-                        return 'Code must be 6 digits';
+                        return context.tr('codeMustBe6Digits');
                       }
                       return null;
                     },
@@ -199,8 +200,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Text(
-                              'Verify Email',
+                          : Text(
+                              context.tr('verifyEmail'),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -216,7 +217,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Didn't receive the code?",
+                        context.tr('didntReceiveCode'),
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade700,
@@ -225,7 +226,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                       TextButton(
                         onPressed: _isLoading ? null : _resendCode,
                         child: Text(
-                          'Resend',
+                          context.tr('resend'),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,

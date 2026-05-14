@@ -10,6 +10,7 @@ import '../widgets/ocr_status_widget.dart';
 import 'model_download_screen.dart';
 import 'scan_history_screen.dart';
 import 'phone_camera_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -40,9 +41,9 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text(
-          'LexiPal',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          context.tr('appName'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -59,7 +60,7 @@ class HomeScreen extends StatelessWidget {
               );
             },
             icon: const Icon(Icons.download),
-            tooltip: 'Translation Models',
+            tooltip: context.tr('translationModels'),
           ),
         ],
         bottom: PreferredSize(
@@ -77,10 +78,10 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // OCR Backend Status
-                const OcrStatusWidget(),
+                // OCR Backend Status - HIDDEN
+                // const OcrStatusWidget(),
                 
-                const SizedBox(height: 24),
+                // const SizedBox(height: 24),
                 
                 // Scan Control Buttons - ALWAYS VISIBLE
                 Container(
@@ -105,7 +106,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              provider.isScanning ? 'Scanning Active' : 'Ready to Scan',
+                              provider.isScanning ? context.tr('scanningActive') : context.tr('readyToScan'),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -117,8 +118,8 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         Text(
                           provider.isScanning
-                              ? 'Capturing frames... Click Stop to process'
-                              : 'Click Start to scan text',
+                              ? context.tr('capturingFrames')
+                              : context.tr('clickStartToScan'),
                           style: const TextStyle(fontSize: 13, color: Colors.black87),
                         ),
                         
@@ -131,20 +132,68 @@ class HomeScreen extends StatelessWidget {
                               color: Colors.red.shade100,
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.error_outline, 
-                                    color: Colors.red.shade700, size: 16),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    provider.cameraError!,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.red.shade900,
+                                Row(
+                                  children: [
+                                    Icon(Icons.error_outline, 
+                                        color: Colors.red.shade700, size: 16),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        provider.cameraError!,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.red.shade900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                // Show network scan button if ESP32 is not connected
+                                if (provider.cameraMode == CameraMode.esp32 && 
+                                    !provider.esp32Connected) ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: provider.scanStatus.isNotEmpty 
+                                          ? null 
+                                          : () async {
+                                              await provider.checkEsp32Connection(
+                                                performNetworkScan: true,
+                                              );
+                                            },
+                                      icon: provider.scanStatus.isNotEmpty
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
+                                              ),
+                                            )
+                                          : const Icon(Icons.search, size: 16),
+                                      label: Text(
+                                        provider.scanStatus.isNotEmpty
+                                            ? provider.scanStatus
+                                            : context.tr('scanNetworkForESP32'),
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange.shade700,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                          horizontal: 12,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
@@ -161,7 +210,7 @@ class HomeScreen extends StatelessWidget {
                               provider.isScanning ? Icons.stop : Icons.camera_alt,
                             ),
                             label: Text(
-                              provider.isScanning ? 'Stop Scanning' : 'Start Scanning',
+                              provider.isScanning ? context.tr('stopScanning') : context.tr('startScanning'),
                               style: const TextStyle(fontSize: 16),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -183,9 +232,9 @@ class HomeScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Latest Scan',
-                      style: TextStyle(
+                    Text(
+                      context.tr('latestScan'),
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -201,7 +250,7 @@ class HomeScreen extends StatelessWidget {
                           );
                         },
                         icon: const Icon(Icons.history, size: 20),
-                        label: Text('View All (${provider.recognizedTexts.length})'),
+                        label: Text('${context.tr('viewAll')} (${provider.recognizedTexts.length})'),
                       ),
                   ],
                 ),
@@ -241,7 +290,7 @@ class HomeScreen extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: provider.clearRecognizedTexts,
                           icon: const Icon(Icons.clear_all),
-                          label: const Text('Clear Text'),
+                          label: Text(context.tr('clearText')),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
                             foregroundColor: Colors.white,
@@ -254,7 +303,7 @@ class HomeScreen extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: provider.disconnect,
                           icon: const Icon(Icons.link_off),
-                          label: const Text('Disconnect'),
+                          label: Text(context.tr('disconnect')),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
                             foregroundColor: Colors.white,
@@ -275,9 +324,9 @@ class HomeScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Accessibility Features',
-                            style: TextStyle(
+                          Text(
+                            context.tr('accessibilityFeatures'),
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -289,13 +338,13 @@ class HomeScreen extends StatelessWidget {
                                 child: OutlinedButton.icon(
                                   onPressed: () {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Font size increased'),
+                                      SnackBar(
+                                        content: Text(context.tr('fontSizeIncreased')),
                                       ),
                                     );
                                   },
                                   icon: const Icon(Icons.text_increase),
-                                  label: const Text('Large Font'),
+                                  label: Text(context.tr('largeFont')),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -303,13 +352,13 @@ class HomeScreen extends StatelessWidget {
                                 child: OutlinedButton.icon(
                                   onPressed: () {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('High contrast mode enabled'),
+                                      SnackBar(
+                                        content: Text(context.tr('highContrastEnabled')),
                                       ),
                                     );
                                   },
                                   icon: const Icon(Icons.contrast),
-                                  label: const Text('High Contrast'),
+                                  label: Text(context.tr('highContrast')),
                                 ),
                               ),
                             ],

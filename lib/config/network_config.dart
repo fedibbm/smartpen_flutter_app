@@ -4,7 +4,9 @@
 
 class NetworkConfig {
   // Python OpenCV OCR Server Configuration
-  static const String ocrServerBaseUrl = 'http://ocr-demo-enit.francecentral.azurecontainer.io:5000';
+  // LOCAL NETWORK: Change to your machine's IP address when testing locally
+  static const String ocrServerBaseUrl = 'http://192.168.1.14:5000';
+  // AZURE (Production): 'http://ocr-demo-enit.francecentral.azurecontainer.io:5000'
   
   static String get ocrExtractTextEndpoint => '$ocrServerBaseUrl/ocr';
   static String get ocrStitchEndpoint => '$ocrServerBaseUrl/ocr-stitch';
@@ -27,7 +29,7 @@ class NetworkConfig {
       '$dictionaryApiBaseUrl/api/v2/entries/$language/${Uri.encodeComponent(word)}';
   
   // ESP32-CAM Configuration (for future integration)
-  static const String esp32CamHost = '192.168.1.100'; // Change to your ESP32-CAM IP
+  static const String esp32CamHost = '192.168.43.50'; // Change to your ESP32-CAM IP
   static const int esp32CamPort = 80;
   static const String esp32CamProtocol = 'http';
   

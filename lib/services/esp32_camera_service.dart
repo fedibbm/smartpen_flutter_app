@@ -1,25 +1,31 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../config/network_config.dart';
 import '../config/device_config.dart';
+import 'esp32_discovery_service.dart';
 
 /// Service for ESP32-CAM video streaming integration
 /// ⚠️ DISABLED - This service is fully implemented but NOT connected to the UI yet
 /// ⚠️ Future integration: Will receive video frames from ESP32-CAM for OCR processing
 class Esp32CameraService {
   final http.Client _client;
+  final Esp32DiscoveryService _discoveryService;
   StreamController<Esp32Frame>? _frameStreamController;
   Timer? _connectionMonitor;
   Esp32ConnectionStatus _connectionStatus = Esp32ConnectionStatus.disconnected;
   String? _errorMessage;
+  String? _currentIp;
 
   Esp32CameraService({http.Client? client}) 
-    : _client = client ?? http.Client();
+    : _client = client ?? http.Client(),
+      _discoveryService = Esp32DiscoveryService(client: client);
 
   Esp32ConnectionStatus get connectionStatus => _connectionStatus;
   String? get errorMessage => _errorMessage;
   Stream<Esp32Frame>? get frameStream => _frameStreamController?.stream;
+  String? get currentIp => _currentIp;
 
   /// Check if ESP32-CAM is enabled in configuration
   bool get isEnabled => DeviceConfig.enableEsp32Integration;
@@ -175,16 +181,109 @@ class Esp32CameraService {
     }
   }
 
-  /// Test ESP32 connection
-  Future<bool> testConnection() async {
+  /// Test ESP32 connection, with optional automatic discovery
+  Future<bool> testConnection({
+    bool performNetworkScan = false,
+    Function(String)? onScanProgress,
+    Function(int, int)? onScanStep,
+  }) async {
     try {
-      final response = await _client
-          .get(Uri.parse(NetworkConfig.esp32CamStatusEndpoint))
-          .timeout(NetworkConfig.connectionTimeout);
-      return response.statusCode == 200;
+      // First, always try the hardcoded IP from NetworkConfig
+      _currentIp = NetworkConfig.esp32CamHost;
+      debugPrint('🔍 Testing hardcoded IP: $_currentIp');
+      
+      final url = 'http://$_currentIp:${NetworkConfig.esp32CamPort}/stream';
+      try {
+        final response = await _client
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 3));
+        
+        if (response.statusCode == 200) {
+          debugPrint('✅ ESP32-CAM connected at hardcoded IP: $_currentIp');
+          return true;
+        }
+      } catch (e) {
+        debugPrint('⚠️ Hardcoded IP not responding: $e');
+      }
+
+      // If hardcoded IP failed and network scan is not requested, return false
+      if (!performNetworkScan) {
+        debugPrint('❌ ESP32-CAM not found at hardcoded IP. Network scan not requested.');
+        return false;
+      }
+
+      // Network scan requested - try saved IP first
+      final savedIp = await _discoveryService.getSavedIp();
+      if (savedIp != null && savedIp != NetworkConfig.esp32CamHost) {
+        _currentIp = savedIp;
+        debugPrint('🔍 Testing saved IP: $savedIp');
+        
+        try {
+          final savedUrl = 'http://$savedIp:${NetworkConfig.esp32CamPort}/stream';
+          final response = await _client
+              .get(Uri.parse(savedUrl))
+              .timeout(const Duration(seconds: 3));
+          
+          if (response.statusCode == 200) {
+            debugPrint('✅ ESP32-CAM connected at saved IP: $savedIp');
+            return true;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Saved IP not responding: $e');
+        }
+      }
+
+      // Quick scan
+      debugPrint('🔍 Starting quick scan for ESP32-CAM...');
+      onScanProgress?.call('Quick scanning for ESP32-CAM...');
+      
+      final quickResult = await _discoveryService.quickScan(
+        onProgress: onScanProgress,
+      );
+      
+      if (quickResult != null) {
+        _currentIp = quickResult;
+        debugPrint('✅ ESP32-CAM found at: $quickResult');
+        return true;
+      }
+
+      // Full network scan
+      debugPrint('🔍 Quick scan failed, starting full network scan...');
+      onScanProgress?.call('Scanning network for ESP32-CAM...');
+      
+      final foundIp = await _discoveryService.scanNetwork(
+        onProgress: onScanProgress,
+        onScanProgress: onScanStep,
+      );
+
+      if (foundIp != null) {
+        _currentIp = foundIp;
+        debugPrint('✅ ESP32-CAM found at: $foundIp');
+        return true;
+      }
+
+      debugPrint('❌ ESP32-CAM not found on network');
+      return false;
     } catch (e) {
+      debugPrint('❌ ESP32 connection test failed: $e');
       return false;
     }
+  }
+
+  /// Get the stream endpoint URL using current IP
+  String get _streamEndpoint {
+    if (_currentIp != null) {
+      return 'http://$_currentIp:${NetworkConfig.esp32CamPort}/stream';
+    }
+    return NetworkConfig.esp32CamStreamEndpoint;
+  }
+
+  /// Get the capture endpoint URL using current IP
+  String get _captureEndpoint {
+    if (_currentIp != null) {
+      return 'http://$_currentIp:${NetworkConfig.esp32CamPort}/capture';
+    }
+    return NetworkConfig.esp32CamCaptureEndpoint;
   }
 
   /// Capture a sequence of frames from ESP32 stream
@@ -220,7 +319,7 @@ class Esp32CameraService {
   Future<Uint8List?> _captureSingleFrame() async {
     try {
       final response = await _client
-          .get(Uri.parse(NetworkConfig.esp32CamCaptureEndpoint))
+          .get(Uri.parse(_captureEndpoint))
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {

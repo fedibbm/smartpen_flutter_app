@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:camera/camera.dart';
 import '../providers/smart_pen_provider.dart';
+import '../l10n/app_localizations.dart';
 
 /// Screen for capturing text with phone camera
 class PhoneCameraScreen extends StatefulWidget {
@@ -14,71 +18,201 @@ class PhoneCameraScreen extends StatefulWidget {
 class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
   bool _isCapturing = false;
   int _frameCount = 0;
+  bool _isInitializing = false;
+  final List<Uint8List> _capturedFrameBytes = [];
+  int _captureSessionId = 0;
+  Timer? _captureTimer;
 
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeCamera();
+    });
   }
 
   Future<void> _initializeCamera() async {
+    if (!mounted || _isInitializing) return;
+    
+    _isInitializing = true;
     final provider = Provider.of<SmartPenProvider>(context, listen: false);
-    if (!provider.phoneCameraInitialized) {
-      await provider.initializePhoneCamera();
+    
+    try {
+      if (!provider.phoneCameraInitialized) {
+        final success = await provider.initializePhoneCamera();
+        if (!success || !mounted) {
+          _isInitializing = false;
+          return;
+        }
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      if (!mounted) {
+        _isInitializing = false;
+        return;
+      }
+      
+      debugPrint('✅ Camera ready - waiting for user to start capture');
+    } catch (e) {
+      debugPrint('❌ Camera initialization error: $e');
+    } finally {
+      _isInitializing = false;
     }
+  }
+  
+  @override
+  void deactivate() {
+    _captureTimer?.cancel();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _captureTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _startCapture() async {
-    if (_isCapturing) return;
-
-    setState(() {
-      _isCapturing = true;
-      _frameCount = 0;
-    });
-
-    final provider = Provider.of<SmartPenProvider>(context, listen: false);
+    _captureSessionId++;
+    final sessionId = _captureSessionId;
     
-    // Start capturing frames
-    await provider.phoneCameraService.startCapturing();
-
-    // Update frame count every 200ms
-    while (_isCapturing && mounted) {
-      await Future.delayed(const Duration(milliseconds: 200));
-      if (mounted) {
-        setState(() {
-          _frameCount = provider.phoneCameraService.capturedFrames.length;
-        });
-      }
+    debugPrint('');
+    debugPrint('═══════════════════════════════════════════');
+    debugPrint('🎬 START CAPTURE - Session #$sessionId');
+    debugPrint('═══════════════════════════════════════════');
+    
+    if (_isCapturing) {
+      debugPrint('❌ Already capturing - ignoring');
+      return;
     }
-  }
-
-  Future<void> _stopCapture() async {
-    if (!_isCapturing) return;
-
-    setState(() {
-      _isCapturing = false;
-    });
 
     final provider = Provider.of<SmartPenProvider>(context, listen: false);
-    provider.phoneCameraService.stopCapturing();
-
-    final frames = provider.phoneCameraService.getFramesAndClear();
+    final controller = provider.phoneCameraService.controller;
     
-    if (frames.isEmpty) {
+    if (controller == null || !controller.value.isInitialized) {
+      debugPrint('❌ Camera not ready');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No frames captured. Please try again.'),
+          SnackBar(
+            content: Text(context.tr('cameraNotReady')),
             backgroundColor: Colors.red,
           ),
         );
       }
       return;
     }
+    
+    _capturedFrameBytes.clear();
+    
+    setState(() {
+      _isCapturing = true;
+      _frameCount = 0;
+    });
+    
+    debugPrint('📸 Starting frame capture every 400ms...');
+    
+    _captureTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) async {
+      if (!_isCapturing || !mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      try {
+        final image = await controller.takePicture();
+        final bytes = await image.readAsBytes();
+        _capturedFrameBytes.add(bytes);
+        
+        if (mounted) {
+          setState(() {
+            _frameCount = _capturedFrameBytes.length;
+          });
+        }
+        
+        debugPrint('📷 Captured frame ${_capturedFrameBytes.length} (${bytes.length} bytes)');
+        
+        if (_capturedFrameBytes.length >= 30) {
+          debugPrint('⚠️ Reached 30 frames limit - stopping automatically');
+          if (mounted) {
+            _stopCapture();
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error capturing frame: $e');
+      }
+    });
+  }
 
-    // Navigate back and process frames
+  Future<void> _stopCapture() async {
+    debugPrint('');
+    debugPrint('═══════════════════════════════════════════');
+    debugPrint('🛑 STOP CAPTURE - Session #$_captureSessionId');
+    debugPrint('═══════════════════════════════════════════');
+    
+    if (!_isCapturing) {
+      debugPrint('❌ Not capturing - ignoring stop request');
+      return;
+    }
+
+    _captureTimer?.cancel();
+    _captureTimer = null;
+    
+    setState(() {
+      _isCapturing = false;
+    });
+    
+    final frameBytes = List<Uint8List>.from(_capturedFrameBytes);
+    
+    debugPrint('🔄 Processing ${frameBytes.length} captured frames...');
+    
     if (mounted) {
-      Navigator.pop(context, frames);
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(context.tr('processingFrames')),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    final provider = Provider.of<SmartPenProvider>(context, listen: false);
+    
+    try {
+      await provider.processFramesWithMLKit(frameBytes, source: 'Phone Camera');
+      
+      if (mounted) {
+        Navigator.of(context).pop();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Processed ${frameBytes.length} frames successfully'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      debugPrint('❌ Error processing images: $e');
+      
+      if (mounted) {
+        Navigator.of(context).pop();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error processing images: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -87,7 +221,7 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Scan Text'),
+        title: Text(context.tr('scanText')),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
       ),
@@ -103,7 +237,6 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
 
           return Stack(
             children: [
-              // Camera preview
               Center(
                 child: AspectRatio(
                   aspectRatio: controller.value.aspectRatio,
@@ -111,7 +244,6 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                 ),
               ),
 
-              // Scan guide overlay
               if (!_isCapturing)
                 Center(
                   child: Container(
@@ -125,13 +257,13 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.arrow_forward,
+                          Icons.text_fields,
                           color: Colors.white.withOpacity(0.7),
                           size: 48,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Move camera slowly →',
+                          context.tr('pointCameraAtText'),
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 16,
@@ -143,7 +275,6 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                   ),
                 ),
 
-              // Instructions
               Positioned(
                 top: 16,
                 left: 16,
@@ -157,10 +288,29 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.bolt,
+                            color: Colors.green,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '⚡ ML Kit OCR',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       Text(
                         _isCapturing 
-                            ? '📸 Capturing frames... ($_frameCount captured)' 
-                            : '📷 Ready to scan',
+                            ? '📸 Capturing frames... ($_frameCount frames)' 
+                            : context.tr('cameraReady'),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -170,8 +320,8 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                       const SizedBox(height: 4),
                       Text(
                         _isCapturing
-                            ? 'Move camera slowly across the text from left to right'
-                            : 'Tap the button below to start scanning',
+                            ? context.tr('tapToFinish')
+                            : context.tr('tapToStart'),
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.8),
                           fontSize: 13,
@@ -182,7 +332,6 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                 ),
               ),
 
-              // Controls
               Positioned(
                 bottom: 32,
                 left: 0,
@@ -190,7 +339,6 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      // Capture status indicator
                       if (_isCapturing)
                         Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -214,9 +362,9 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                'RECORDING',
-                                style: TextStyle(
+                              Text(
+                                context.tr('capturing'),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -225,9 +373,19 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
                           ),
                         ),
 
-                      // Capture button
                       GestureDetector(
-                        onTap: _isCapturing ? _stopCapture : _startCapture,
+                        onTap: () {
+                          debugPrint('');
+                          debugPrint('👆 Button tapped!');
+                          debugPrint('   Current _isCapturing: $_isCapturing');
+                          debugPrint('   Will call: ${_isCapturing ? "_stopCapture" : "_startCapture"}');
+                          
+                          if (_isCapturing) {
+                            _stopCapture();
+                          } else {
+                            _startCapture();
+                          }
+                        },
                         child: Container(
                           width: 80,
                           height: 80,
@@ -249,7 +407,7 @@ class _PhoneCameraScreenState extends State<PhoneCameraScreen> {
 
                       const SizedBox(height: 8),
                       Text(
-                        _isCapturing ? 'Tap to finish' : 'Tap to start',
+                        _isCapturing ? context.tr('tapToFinish') : context.tr('tapToStart'),
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.8),
                           fontSize: 14,

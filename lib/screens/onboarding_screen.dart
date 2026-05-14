@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/app_localizations.dart';
 
 /// Onboarding screen to introduce users to LexiPal features
 class OnboardingScreen extends StatefulWidget {
@@ -14,20 +15,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<OnboardingPage> _pages = [
+  List<OnboardingPage> _pages(BuildContext context) => [
     OnboardingPage(
-      title: 'Welcome to LexiPal',
-      description: 'Your smart pen and this app work together to help you read any text!',
+      title: context.tr('onbTitle1'),
+      description: context.tr('onbDesc1'),
       imagePath: 'assets/images/screen1.svg',
     ),
     OnboardingPage(
-      title: 'Scan Text. Learn at your pace.',
-      description: 'As you move the pen, the app highlights each word and waits a moment before reading it out loud.',
+      title: context.tr('onbTitle2'),
+      description: context.tr('onbDesc2'),
       imagePath: 'assets/images/screen2.svg',
     ),
     OnboardingPage(
-      title: 'Keep Your Notes',
-      description: 'Your reading history is always one tap away!',
+      title: context.tr('onbTitle3'),
+      description: context.tr('onbDesc3'),
       imagePath: 'assets/images/screen3.svg',
     ),
   ];
@@ -47,8 +48,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  void _nextPage() {
-    if (_currentPage < _pages.length - 1) {
+  void _nextPage(BuildContext context) {
+    if (_currentPage < _pages(context).length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -77,7 +78,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: TextButton(
                   onPressed: _skipOnboarding,
                   child: Text(
-                    'Skip',
+                    context.tr('skip'),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontSize: 16,
@@ -97,9 +98,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _currentPage = index;
                   });
                 },
-                itemCount: _pages.length,
+                itemCount: _pages(context).length,
                 itemBuilder: (context, index) {
-                  return _buildPage(_pages[index]);
+                  return _buildPage(_pages(context)[index]);
                 },
               ),
             ),
@@ -110,7 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
-                  _pages.length,
+                  _pages(context).length,
                   (index) => _buildPageIndicator(index),
                 ),
               ),
@@ -123,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _nextPage,
+                  onPressed: () => _nextPage(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
@@ -133,7 +134,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   child: Text(
-                    _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
+                    _currentPage == _pages(context).length - 1 ? context.tr('getStarted') : context.tr('next'),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

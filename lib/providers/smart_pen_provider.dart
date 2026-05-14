@@ -3,6 +3,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart' as mlkit;
 import '../models/smart_pen_models.dart';
 import '../services/ocr_backend_service.dart';
 import '../services/esp32_camera_service.dart';
@@ -10,9 +12,13 @@ import '../services/phone_camera_service.dart';
 import '../services/image_stitching_service.dart';
 import '../services/hybrid_translation_service.dart';
 import '../services/text_to_speech_service.dart';
+import '../services/mlkit_text_recognition_service.dart';
+import '../providers/notification_provider.dart';
 import '../config/device_config.dart';
+import '../config/network_config.dart';
 import '../utils/mock_image_generator.dart';
 import '../utils/spell_corrector.dart';
+import '../utils/text_overlap_detector.dart';
 
 /// Camera mode for capturing text
 enum CameraMode {
@@ -39,17 +45,22 @@ class SmartPenProvider extends ChangeNotifier {
   late final ImageStitchingService _stitchingService;
   late final HybridTranslationService _translationService;
   late final TextToSpeechService _ttsService;
+  late final MLKitTextRecognitionService _mlKitService;
   bool _useRealOcr = DeviceConfig.enableOcrBackend;
   bool _ocrServerConnected = false;
   bool _textProcessingEnabled = DeviceConfig.enableTextProcessing;
   bool _onlineTranslationAvailable = false;
   bool _onlineDictionaryAvailable = false;
   
+  // OCR mode: 'mlkit' (default, on-device) or 'backend' (Python server)
+  String _ocrMode = 'mlkit';
+  
   // Camera mode state
   CameraMode _cameraMode = CameraMode.esp32; // Default to ESP32
   bool _esp32Connected = false;
   bool _phoneCameraInitialized = false;
   String? _cameraError;
+  String _scanStatus = ''; // Status message during network scanning
   
   // TTS state
   TtsState _ttsState = TtsState.stopped;
@@ -73,11 +84,13 @@ class SmartPenProvider extends ChangeNotifier {
   List<RecognizedText> get recognizedTexts => List.unmodifiable(_recognizedTexts);
   bool get isUsingRealOcr => _useRealOcr && _ocrServerConnected;
   bool get isOcrServerConnected => _ocrServerConnected;
+  String get ocrMode => _ocrMode;
   bool get isScanning => _isScanning;
   bool get isOnlineTranslationAvailable => _onlineTranslationAvailable;
   bool get isOnlineDictionaryAvailable => _onlineDictionaryAvailable;
   HybridTranslationService get translationService => _translationService;
   TextToSpeechService get ttsService => _ttsService;
+  MLKitTextRecognitionService get mlKitService => _mlKitService;
   
   // TTS getters
   TtsState get ttsState => _ttsState;
@@ -93,15 +106,19 @@ class SmartPenProvider extends ChangeNotifier {
   bool get esp32Connected => _esp32Connected;
   bool get phoneCameraInitialized => _phoneCameraInitialized;
   String? get cameraError => _cameraError;
+  String get scanStatus => _scanStatus;
   PhoneCameraService get phoneCameraService => _phoneCameraService;
 
-  SmartPenProvider() {
+  NotificationProvider? notificationProvider;
+
+  SmartPenProvider({this.notificationProvider}) {
     _ocrService = OcrBackendService();
     _esp32Service = Esp32CameraService();
     _phoneCameraService = PhoneCameraService();
     _stitchingService = ImageStitchingService();
     _translationService = HybridTranslationService();
     _ttsService = TextToSpeechService();
+    _mlKitService = MLKitTextRecognitionService();
     _initializeMockDevices();
     _checkOcrServerHealth();
     _checkOnlineServices();
@@ -236,6 +253,17 @@ class SmartPenProvider extends ChangeNotifier {
   void toggleOcrMode() {
     _useRealOcr = !_useRealOcr;
     debugPrint('OCR mode: ${_useRealOcr ? "Real" : "Mock"}');
+    notifyListeners();
+  }
+  
+  /// Switch OCR processing mode
+  void setOcrMode(String mode) {
+    if (mode != 'mlkit' && mode != 'backend') {
+      debugPrint('⚠️ Invalid OCR mode: $mode, using mlkit');
+      mode = 'mlkit';
+    }
+    _ocrMode = mode;
+    debugPrint('🔄 OCR mode set to: $_ocrMode');
     notifyListeners();
   }
 
@@ -471,6 +499,7 @@ class SmartPenProvider extends ChangeNotifier {
       confidence: 0.85 + random.nextDouble() * 0.14, // 85-99% confidence
       timestamp: DateTime.now(),
       definitions: selectedText['definitions'] as List<String>,
+      language: 'en', // or detect if needed
     );
     
     // Auto-play if enabled
@@ -702,27 +731,50 @@ class SmartPenProvider extends ChangeNotifier {
   }
 
   /// Check ESP32 connection status
-  Future<void> checkEsp32Connection() async {
+  Future<void> checkEsp32Connection({bool performNetworkScan = false}) async {
     try {
       _cameraError = null;
+      if (performNetworkScan) {
+        _scanStatus = 'Searching for ESP32-CAM...';
+        notifyListeners();
+      }
       
       // Try to connect to ESP32 stream
-      final connected = await _esp32Service.testConnection();
+      final connected = await _esp32Service.testConnection(
+        performNetworkScan: performNetworkScan,
+        onScanProgress: performNetworkScan ? (message) {
+          _scanStatus = message;
+          notifyListeners();
+        } : null,
+        onScanStep: performNetworkScan ? (current, total) {
+          _scanStatus = 'Scanning network: $current/$total devices checked';
+          notifyListeners();
+        } : null,
+      );
+      
       _esp32Connected = connected;
 
-      if (!connected && _cameraMode == CameraMode.esp32) {
-        _cameraError = 'ESP32-CAM not connected. Please check the device or switch to phone camera mode.';
+      if (connected) {
+        _scanStatus = performNetworkScan 
+            ? 'ESP32-CAM connected at ${_esp32Service.currentIp}'
+            : '';
+      } else if (_cameraMode == CameraMode.esp32) {
+        _cameraError = performNetworkScan
+            ? 'ESP32-CAM not found on network. Please check the device or switch to phone camera mode.'
+            : 'ESP32-CAM not connected at ${NetworkConfig.esp32CamHost}. Try network scan or switch to phone camera mode.';
+        _scanStatus = '';
       }
 
       notifyListeners();
       debugPrint(_esp32Connected 
-          ? '✅ ESP32-CAM connected' 
+          ? '✅ ESP32-CAM connected at ${_esp32Service.currentIp}' 
           : '⚠️ ESP32-CAM not connected');
     } catch (e) {
       _esp32Connected = false;
       if (_cameraMode == CameraMode.esp32) {
         _cameraError = 'Cannot reach ESP32-CAM: $e';
       }
+      _scanStatus = '';
       notifyListeners();
       debugPrint('❌ ESP32 connection check failed: $e');
     }
@@ -787,16 +839,15 @@ class SmartPenProvider extends ChangeNotifier {
         throw Exception('No frames captured from ESP32');
       }
 
-      // Stitch frames into panoramic image
-      final stitchedImage = await _stitchingService.stitchFrames(frames);
+      debugPrint('✅ Captured ${frames.length} frames from ESP32');
       
-      // Send to OCR
-      await _processStitchedImage(stitchedImage);
+      // Process frames using unified ML Kit pipeline (same as phone camera)
+      await processFramesWithMLKit(frames, source: 'ESP32-CAM');
+      
     } catch (e) {
       debugPrint('❌ ESP32 scan failed: $e');
       _cameraError = 'ESP32 scan failed: $e';
       _recognitionStatus = RecognitionStatus.error;
-    } finally {
       _isScanning = false;
       notifyListeners();
     }
@@ -813,49 +864,135 @@ class SmartPenProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Process a single camera frame with ML Kit (real-time)
+  Future<void> processCameraFrame(CameraImage image, int rotation) async {
+    if (_ocrMode != 'mlkit') return;
+    
+    try {
+      final result = await _mlKitService.processImage(image, rotation);
+      
+      if (result.wasThrottled) {
+        // Frame was throttled, skip silently
+        return;
+      }
+      
+      if (!result.success) {
+        debugPrint('ML Kit error: ${result.error}');
+        return;
+      }
+      
+      // Process unique text blocks
+      if (result.uniqueCount > 0) {
+        final combinedText = result.combinedText;
+        
+        // Apply spell correction if enabled
+        String processedText = combinedText;
+        if (_textProcessingEnabled && combinedText.isNotEmpty) {
+          final corrections = SpellCorrector.getCorrections(combinedText);
+          if (corrections.isNotEmpty) {
+            processedText = SpellCorrector.correctText(combinedText);
+            debugPrint('📝 Text corrected: ${corrections.length} changes');
+          }
+        }
+        
+        // Add recognized text
+        _addRecognizedText(
+          processedText,
+          'en', // TODO: Add language detection
+          confidence: 0.95,
+        );
+        
+        debugPrint('✅ ML Kit: ${result.summary}');
+      }
+    } catch (e) {
+      debugPrint('❌ ML Kit processing error: $e');
+    }
+  }
+
   /// Process frames captured from phone camera
   Future<void> processPhoneCameraFrames(List<Uint8List> frames) async {
+    // Delegate to unified processing pipeline
+    await processFramesWithMLKit(frames, source: 'Phone Camera');
+  }
+
+  /// Unified frame processing with ML Kit + overlap detection
+  /// Used by both phone camera and ESP32 modes for consistent results
+  Future<void> processFramesWithMLKit(List<Uint8List> frames, {String source = 'Camera'}) async {
     _isScanning = true;
     _recognitionStatus = RecognitionStatus.processing;
     _cameraError = null;
     notifyListeners();
 
     try {
-      debugPrint('📱 Processing ${frames.length} frames from phone camera...');
+      debugPrint('📱 Processing ${frames.length} frames from $source with ML Kit...');
 
       if (frames.isEmpty) {
         throw Exception('No frames provided');
       }
 
-      // Send frames directly to server for stitching and OCR
-      debugPrint('📤 Sending ${frames.length} frames to server for stitching...');
-      final ocrResult = await _ocrService.extractTextFromFrames(frames);
-      
-      if (ocrResult.extractedText.isEmpty) {
-        throw Exception('No text recognized in stitched image');
+      final List<String> frameTexts = [];
+
+      // Process each frame with ML Kit
+      for (int i = 0; i < frames.length; i++) {
+        try {
+          // Create InputImage from bytes
+          final inputImage = mlkit.InputImage.fromBytes(
+            bytes: frames[i],
+            metadata: mlkit.InputImageMetadata(
+              size: Size(640, 480), // Approximate, ML Kit handles various sizes
+              rotation: mlkit.InputImageRotation.rotation0deg,
+              format: mlkit.InputImageFormat.yuv420,
+              bytesPerRow: 640,
+            ),
+          );
+
+          // Process with ML Kit
+          final result = await _mlKitService.processStaticImage(inputImage);
+
+          // Collect text from this frame (combine all blocks)
+          if (result.success && result.blocks.isNotEmpty) {
+            final frameText = result.blocks
+                .map((block) => block.text.trim())
+                .where((text) => text.isNotEmpty)
+                .join(' ');
+
+            if (frameText.isNotEmpty) {
+              frameTexts.add(frameText);
+              debugPrint('   Frame ${i + 1}: ${result.blocks.length} blocks');
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error processing frame ${i + 1}: $e');
+          // Continue with other frames
+        }
       }
 
-      // Add to recognized texts (assume English for now)
-      _addRecognizedText(
-        ocrResult.extractedText,
-        'en',
-        confidence: ocrResult.confidence,
-      );
-      
-      _recognitionStatus = RecognitionStatus.completed;
-      debugPrint('✅ OCR completed: "${ocrResult.extractedText}"');
-    } catch (e) {
-      debugPrint('❌ Phone camera processing failed: $e');
-      
-      // Provide more specific error messages
-      if (e.toString().contains('stitching')) {
-        _cameraError = 'Failed to stitch frames together. Try scanning more slowly.';
-      } else if (e.toString().contains('timed out')) {
-        _cameraError = 'Request timed out. Check your internet connection.';
-      } else {
-        _cameraError = 'Processing failed: $e';
+      if (frameTexts.isEmpty) {
+        throw Exception('No text detected in any frame');
       }
-      
+
+      // Merge frame texts with overlap detection
+      debugPrint('🔍 Detecting and removing overlaps between ${frameTexts.length} frames...');
+      final mergedText = TextOverlapDetector.mergeTexts(frameTexts, similarityThreshold: 0.75);
+
+      // Add to recognized texts
+      _addRecognizedText(
+        mergedText,
+        'en',
+        confidence: 0.85, // ML Kit confidence
+      );
+
+      _recognitionStatus = RecognitionStatus.completed;
+      debugPrint('✅ Processing complete: Merged ${frameTexts.length} frames');
+      debugPrint('   Original length: ${frameTexts.map((t) => t.length).reduce((a, b) => a + b)} chars');
+      debugPrint('   Merged length: ${mergedText.length} chars');
+    } catch (e) {
+      debugPrint('❌ Frame processing failed: $e');
+
+      _cameraError = e.toString().contains('No text detected')
+          ? 'No text detected in frames. Try scanning clearer text.'
+          : 'Processing failed: $e';
+
       _recognitionStatus = RecognitionStatus.error;
     } finally {
       _isScanning = false;
@@ -875,24 +1012,50 @@ class SmartPenProvider extends ChangeNotifier {
     Future.delayed(const Duration(seconds: 2), () {
       _isScanning = false;
       _recognitionStatus = RecognitionStatus.completed;
-      
+
       // Generate mock text
       final mockTexts = [
-        'The quick brown fox jumps over the lazy dog.',
-        'Flutter is an open source framework by Google.',
-        'Accessibility features help everyone use technology.',
-        'La technologie rend le monde plus accessible.',
-        'Les livres sont une porte vers de nouveaux mondes.',
-        'Chaque jour apporte de nouvelles opportunités.',
-        'التكنولوجيا تجعل العالم أكثر سهولة.',
-        'الكتب هي بوابة إلى عوالم جديدة.',
-        'كل يوم يجلب فرصا جديدة.',
-        'كان الجوّ هادئًا، والناسُ يسيرون ببطءٍ في الشارع',
+        'The quick brown fox jumps over the lazy dog.', // en
+        'Flutter is an open source framework by Google.', // en
+        'Accessibility features help everyone use technology.', // en
+        'La technologie rend le monde plus accessible.', // fr
+        'Les livres sont une porte vers de nouveaux mondes.', // fr
+        'Chaque jour apporte de nouvelles opportunités.', // fr
+        'التكنولوجيا تجعل العالم أكثر سهولة.', // ar
+        'الكتب هي بوابة إلى عوالم جديدة.', // ar
+        'كل يوم يجلب فرصا جديدة.', // ar
+        'كان الجوّ هادئًا، والناسُ يسيرون ببطءٍ في الشارع', // ar
       ];
       final random = Random();
       final mockText = mockTexts[random.nextInt(mockTexts.length)];
-      
-      _addRecognizedText(mockText, 'en', confidence: 0.95);
+
+      // Detect language based on content
+      String language;
+      if (mockText.contains(RegExp(r'^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]'))) {
+        language = 'ar';
+      } else if (mockText.contains(RegExp(r'^[A-Za-z]'))) {
+        // crude: if it starts with a Latin letter, check for French keywords
+        if (mockText.contains('La technologie') ||
+            mockText.contains('Les livres') ||
+            mockText.contains('Chaque jour')) {
+          language = 'fr';
+        } else {
+          language = 'en';
+        }
+      } else if (mockText.contains('La technologie') ||
+                 mockText.contains('Les livres') ||
+                 mockText.contains('Chaque jour')) {
+        language = 'fr';
+      } else {
+        // fallback: check for Arabic characters
+        if (mockText.contains(RegExp(r'[\u0600-\u06FF]'))) {
+          language = 'ar';
+        } else {
+          language = 'en';
+        }
+      }
+
+      _addRecognizedText(mockText, language, confidence: 0.95);
       notifyListeners();
     });
   }
@@ -925,6 +1088,11 @@ class SmartPenProvider extends ChangeNotifier {
   }
 
   /// Add recognized text to history
+  void addRecognizedText(String text, String language, {double confidence = 1.0}) {
+    _addRecognizedText(text, language, confidence: confidence);
+  }
+  
+  /// Add recognized text to history (internal)
   void _addRecognizedText(String text, String language, {double confidence = 1.0}) {
     final recognizedText = RecognizedText(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -935,6 +1103,7 @@ class SmartPenProvider extends ChangeNotifier {
       confidence: confidence,
       timestamp: DateTime.now(),
       definitions: [], // TODO: Add word definitions
+      language: language,
     );
 
     _recognizedTexts.insert(0, recognizedText);
@@ -942,6 +1111,9 @@ class SmartPenProvider extends ChangeNotifier {
 
     // Auto-play if enabled
     _autoPlayTextIfEnabled(text, language);
+
+    // Fire notification for scan completion
+    notificationProvider?.onScanComplete(text);
   }
 
   @override
@@ -954,6 +1126,7 @@ class SmartPenProvider extends ChangeNotifier {
     _phoneCameraService.dispose();
     _translationService.dispose();
     _ttsService.dispose();
+    _mlKitService.dispose();
     super.dispose();
   }
 }

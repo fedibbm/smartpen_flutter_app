@@ -11,7 +11,6 @@ class PhoneCameraService {
   bool _isInitialized = false;
   bool _isCapturing = false;
   final List<Uint8List> _capturedFrames = [];
-  Timer? _captureTimer;
 
   bool get isInitialized => _isInitialized;
   bool get isCapturing => _isCapturing;
@@ -54,7 +53,7 @@ class PhoneCameraService {
   }
 
   /// Start capturing frames at regular intervals
-  Future<void> startCapturing({Duration interval = const Duration(milliseconds: 200)}) async {
+  Future<void> startCapturing({Duration interval = const Duration(milliseconds: 500)}) async {
     if (!_isInitialized || _controller == null) {
       debugPrint('⚠️ Camera not initialized');
       return;
@@ -70,38 +69,54 @@ class PhoneCameraService {
     
     debugPrint('📸 Started capturing frames (interval: ${interval.inMilliseconds}ms)');
 
-    // Capture frames at intervals
-    _captureTimer = Timer.periodic(interval, (timer) async {
-      if (!_isCapturing || _controller == null || !_controller!.value.isInitialized) {
-        timer.cancel();
-        return;
-      }
+    // Start continuous capture loop in background
+    _captureLoop(interval);
+  }
 
+  /// Continuous capture loop - properly awaits each capture
+  Future<void> _captureLoop(Duration interval) async {
+    while (_isCapturing && _controller != null && _controller!.value.isInitialized) {
       try {
         final image = await _controller!.takePicture();
         final bytes = await image.readAsBytes();
         _capturedFrames.add(bytes);
         
         debugPrint('📸 Captured frame ${_capturedFrames.length}');
+        
+        // Wait for interval before next capture
+        if (_isCapturing) {
+          await Future.delayed(interval);
+        }
       } catch (e) {
         debugPrint('❌ Frame capture failed: $e');
+        // Small delay before retry
+        await Future.delayed(const Duration(milliseconds: 100));
       }
-    });
+    }
+    
+    debugPrint('🛑 Capture loop ended');
   }
 
   /// Stop capturing frames
-  void stopCapturing() {
+  Future<void> stopCapturing() async {
     if (!_isCapturing) return;
 
-    _captureTimer?.cancel();
-    _captureTimer = null;
     _isCapturing = false;
+    
+    // Wait a bit for the capture loop to finish cleanly
+    await Future.delayed(const Duration(milliseconds: 100));
     
     debugPrint('🛑 Stopped capturing (${_capturedFrames.length} frames captured)');
   }
 
   /// Get captured frames and clear buffer
   List<Uint8List> getFramesAndClear() {
+    // Stop capturing first to prevent concurrent modification
+    if (_isCapturing) {
+      _isCapturing = false;
+    }
+    
+    // Create a defensive copy
     final frames = List<Uint8List>.from(_capturedFrames);
     _capturedFrames.clear();
     return frames;

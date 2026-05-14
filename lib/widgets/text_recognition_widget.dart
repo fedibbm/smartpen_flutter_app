@@ -159,6 +159,25 @@ class _TextRecognitionCardState extends State<TextRecognitionCard> {
 
   void _startTranslation() {
     final provider = context.read<SmartPenProvider>();
+    // Use the language property if available, otherwise fallback to detection
+    String sourceLang = 'en';
+    if (widget.text is RecognizedText && (widget.text as RecognizedText).language.isNotEmpty) {
+      sourceLang = (widget.text as RecognizedText).language;
+    } else {
+      // fallback: crude detection
+      final text = widget.text.originalText;
+      if (text.contains(RegExp(r'[\u0600-\u06FF]'))) {
+        sourceLang = 'ar';
+      } else if (text.contains(RegExp(r'[A-Za-z]'))) {
+        if (text.contains('La technologie') ||
+            text.contains('Les livres') ||
+            text.contains('Chaque jour')) {
+          sourceLang = 'fr';
+        } else {
+          sourceLang = 'en';
+        }
+      }
+    }
     if (_cachedLanguage != _selectedLanguage || _translationFuture == null) {
       setState(() {
         _cachedLanguage = _selectedLanguage;
@@ -415,17 +434,53 @@ class _TextRecognitionCardState extends State<TextRecognitionCard> {
                 children: [
                   const Text('Language: ', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(width: 8),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'fr', label: Text('Français')),
-                      ButtonSegment(value: 'ar', label: Text('العربية')),
-                    ],
-                    selected: {_selectedLanguage},
-                    onSelectionChanged: (Set<String> newSelection) {
-                      setState(() {
-                        _selectedLanguage = newSelection.first;
-                        _startTranslation(); // Trigger new translation
-                      });
+                  Builder(
+                    builder: (context) {
+                      // Determine the language of the recognized text
+                      String textLang = 'en';
+                      // Try to infer from widget.text if possible
+                      if (widget.text is RecognizedText && widget.text is dynamic && (widget.text as dynamic).language != null) {
+                        textLang = (widget.text as dynamic).language;
+                      } else {
+                        // Fallback: crude detection
+                        final text = widget.text.originalText;
+                        if (text.contains(RegExp(r'[\u0600-\u06FF]'))) {
+                          textLang = 'ar';
+                        } else if (text.contains(RegExp(r'[A-Za-z]'))) {
+                          // crude: if it starts with a Latin letter, check for French keywords
+                          if (text.contains('La technologie') ||
+                              text.contains('Les livres') ||
+                              text.contains('Chaque jour')) {
+                            textLang = 'fr';
+                          } else {
+                            textLang = 'en';
+                          }
+                        }
+                      }
+                      // Supported languages
+                      final allLangs = [
+                        {'code': 'en', 'label': 'English'},
+                        {'code': 'fr', 'label': 'Français'},
+                        {'code': 'ar', 'label': 'العربية'},
+                      ];
+                      // Exclude the current text's language
+                      final targetLangs = allLangs.where((l) => l['code'] != textLang).toList();
+                      // If the current selected language is not available, default to the first
+                      if (!targetLangs.any((l) => l['code'] == _selectedLanguage)) {
+                        _selectedLanguage = targetLangs.first['code']!;
+                      }
+                      return SegmentedButton<String>(
+                        segments: targetLangs
+                            .map((l) => ButtonSegment(value: l['code']!, label: Text(l['label']!)))
+                            .toList(),
+                        selected: {_selectedLanguage},
+                        onSelectionChanged: (Set<String> newSelection) {
+                          setState(() {
+                            _selectedLanguage = newSelection.first;
+                            _startTranslation(); // Trigger new translation
+                          });
+                        },
+                      );
                     },
                   ),
                   const Spacer(),

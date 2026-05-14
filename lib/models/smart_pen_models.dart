@@ -49,6 +49,10 @@ class RecognizedText {
   final double confidence;
   final DateTime timestamp;
   final List<String> definitions;
+  final int? frameId;
+  final List<TextRegion>? regions;
+  final String? processingMode;
+  final String language; // NEW: language code (e.g., 'en', 'fr', 'ar')
 
   RecognizedText({
     required this.id,
@@ -59,7 +63,51 @@ class RecognizedText {
     required this.confidence,
     required this.timestamp,
     required this.definitions,
+    required this.language,
+    this.frameId,
+    this.regions,
+    this.processingMode,
   });
+}
+
+class TextRegion {
+  final String regionId;
+  final String? trackingId;
+  final List<int> bbox; // [x, y, width, height]
+  final String text;
+  final double confidence;
+  final int frameId;
+
+  TextRegion({
+    required this.regionId,
+    this.trackingId,
+    required this.bbox,
+    required this.text,
+    required this.confidence,
+    required this.frameId,
+  });
+
+  factory TextRegion.fromJson(Map<String, dynamic> json) {
+    return TextRegion(
+      regionId: json['region_id'] ?? '',
+      trackingId: json['tracking_id'],
+      bbox: List<int>.from(json['bbox'] ?? [0, 0, 0, 0]),
+      text: json['text'] ?? '',
+      confidence: (json['confidence'] ?? 0.0).toDouble(),
+      frameId: json['frame_id'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'region_id': regionId,
+      'tracking_id': trackingId,
+      'bbox': bbox,
+      'text': text,
+      'confidence': confidence,
+      'frame_id': frameId,
+    };
+  }
 }
 
 class PenStroke {

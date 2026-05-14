@@ -7,6 +7,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import '../providers/smart_pen_provider.dart';
+import '../l10n/app_localizations.dart';
 
 class ModelDownloadScreen extends StatefulWidget {
   const ModelDownloadScreen({Key? key}) : super(key: key);
@@ -23,9 +24,9 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
   };
 
   final Map<String, String> _modelNames = {
-    'en': 'English',
-    'fr': 'French (Français)',
-    'ar': 'Arabic (العربية)',
+    'en': 'english',
+    'fr': 'french',
+    'ar': 'arabic',
   };
 
   bool _isDownloading = false;
@@ -272,7 +273,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to download ${_modelNames[lang]}: $e'),
+              content: Text('${context.tr('downloadFailed').replaceAll('{model}', context.tr(_modelNames[lang]!))}: $e'),
               backgroundColor: Colors.red.shade700,
             ),
           );
@@ -290,8 +291,8 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
       if (_modelStatus.values.every((s) => s == ModelDownloadStatus.downloaded)) {
         debugPrint('🎉 All models downloaded successfully!');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ All translation models downloaded successfully!'),
+          SnackBar(
+            content: Text(context.tr('allModelsDownloaded')),
             backgroundColor: Colors.green,
           ),
         );
@@ -327,7 +328,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ ${_modelNames[lang]} model downloaded!'),
+            content: Text(context.tr('modelDownloaded')),
             backgroundColor: Colors.green,
           ),
         );
@@ -340,7 +341,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to download ${_modelNames[lang]}: $e'),
+            content: Text('${context.tr('downloadFailed').replaceAll('{model}', context.tr(_modelNames[lang]!))}: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -362,16 +363,16 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Model'),
-        content: Text('Are you sure you want to delete the ${_modelNames[lang]} model?'),
+        title: Text(context.tr('deleteModel')),
+        content: Text(context.tr('deleteModelConfirm').replaceAll('{model}', context.tr(_modelNames[lang]!))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.tr('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(context.tr('delete'), style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -385,14 +386,14 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
             _modelStatus[lang] = ModelDownloadStatus.notStarted;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${_modelNames[lang]} model deleted')),
+            SnackBar(content: Text(context.tr('modelDeleted'))),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to delete model: $e'),
+              content: Text('${context.tr('deleteFailed')}: $e'),
               backgroundColor: Colors.red.shade700,
             ),
           );
@@ -408,7 +409,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Translation Models'),
+        title: Text(context.tr('translationModels')),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
@@ -439,8 +440,8 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                     Expanded(
                       child: Text(
                         allDownloaded
-                            ? 'All Models Downloaded'
-                            : 'Download Translation Models',
+                            ? context.tr('allModelsDownloaded')
+                            : context.tr('downloadTranslationModels'),
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -452,7 +453,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Download language models for offline translation. Each model is approximately 30-40 MB.',
+                  context.tr('downloadModelsDescription'),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.9),
@@ -499,10 +500,10 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                           )
                         : const Icon(Icons.download),
                     label: Text(_isDownloading 
-                        ? 'Downloading...' 
+                        ? context.tr('downloading')
                         : !_isConnectedToInternet 
-                            ? 'No Internet Connection' 
-                            : 'Download All Models'),
+                            ? context.tr('noInternetConnection')
+                            : context.tr('downloadAllModels')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
@@ -528,7 +529,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Ready to Translate!',
+                                  context.tr('readyToTranslate'),
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -537,7 +538,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'All translation models are installed. You can now translate text offline.',
+                                  context.tr('modelsInstalled'),
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.green.shade800,
@@ -565,7 +566,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Download Error',
+                                  context.tr('downloadError'),
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -574,7 +575,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Some models failed to download. Check your internet connection and try again.',
+                                  context.tr('downloadErrorDesc'),
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.red.shade800,
@@ -602,7 +603,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Internet Required',
+                                  context.tr('internetRequired'),
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -611,7 +612,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'An internet connection is required to download translation models. Please connect to WiFi or mobile data.',
+                                  context.tr('internetRequiredDesc'),
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.orange.shade800,
@@ -653,7 +654,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
             ),
             const SizedBox(width: 8),
             Text(
-              'Checking connection...',
+              context.tr('checkingConnection'),
               style: TextStyle(
                 color: Colors.white.withOpacity(0.9),
                 fontSize: 12,
@@ -694,8 +695,8 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
               children: [
                 Text(
                   _isConnectedToInternet 
-                      ? 'Connected to Internet'
-                      : 'No Internet Connection',
+                      ? context.tr('connectedToInternet')
+                      : context.tr('noInternetConnection'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -750,7 +751,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _modelNames[lang]!,
+                        context.tr(_modelNames[lang]!),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -776,7 +777,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
               const LinearProgressIndicator(),
               const SizedBox(height: 8),
               Text(
-                'This may take 1-2 minutes depending on your connection...',
+                context.tr('downloadInProgress'),
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade600,
@@ -820,7 +821,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
       return IconButton(
         onPressed: _isDownloading ? null : () => _deleteModel(lang),
         icon: const Icon(Icons.delete),
-        tooltip: 'Delete model',
+        tooltip: context.tr('deleteModel'),
         color: Colors.red.shade700,
       );
     }
@@ -829,7 +830,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
       return TextButton.icon(
         onPressed: _isDownloading ? null : () => _downloadSingleModel(lang),
         icon: const Icon(Icons.refresh, size: 20),
-        label: const Text('Retry'),
+        label: Text(context.tr('retry')),
       );
     }
 
@@ -837,7 +838,7 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
       return ElevatedButton.icon(
         onPressed: (_isDownloading || !_isConnectedToInternet) ? null : () => _downloadSingleModel(lang),
         icon: const Icon(Icons.download, size: 20),
-        label: Text(!_isConnectedToInternet ? 'No Internet' : 'Download'),
+        label: Text(!_isConnectedToInternet ? context.tr('noInternet') : context.tr('download')),
         style: ElevatedButton.styleFrom(
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
@@ -849,17 +850,17 @@ class _ModelDownloadScreenState extends State<ModelDownloadScreen> {
   }
 
   String _getStatusText(ModelDownloadStatus status, bool isDownloading) {
-    if (isDownloading) return 'Downloading... (~30-40 MB)';
+    if (isDownloading) return context.tr('downloadingModel');
     
     switch (status) {
       case ModelDownloadStatus.downloaded:
-        return 'Downloaded • Ready to use';
+        return context.tr('downloadedReady');
       case ModelDownloadStatus.downloading:
-        return 'Downloading...';
+        return context.tr('downloading');
       case ModelDownloadStatus.error:
-        return 'Download failed';
+        return context.tr('downloadFailedStatus');
       case ModelDownloadStatus.notStarted:
-        return 'Not downloaded • ~30-40 MB';
+        return context.tr('notDownloaded');
     }
   }
 

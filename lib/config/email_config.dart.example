@@ -1,0 +1,11 @@
+/// Email SMTP configuration template for Brevo
+/// Copy this file to email_config.dart and fill in your credentials
+class EmailConfig {
+  // Brevo SMTP Configuration
+  static const String smtpHost = 'smtp-relay.brevo.com';
+  static const int smtpPort = 587;
+  static const String smtpUsername = 'YOUR_BREVO_USERNAME';
+  static const String smtpPassword = 'YOUR_BREVO_PASSWORD';
+  static const String senderEmail = 'YOUR_SENDER_EMAIL';
+  static const String senderName = 'DyslexiPen Reader';
+}

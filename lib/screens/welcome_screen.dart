@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'home_screen.dart';
 import 'user_profile_screen.dart';
 
@@ -48,9 +49,9 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 40),
-                const Text(
-                  'DyslexiPen Reader',
-                  style: TextStyle(
+                Text(
+                  context.tr('dyslexipenReader'),
+                  style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -60,7 +61,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Smart pen text recognition for dyslexic readers',
+                  context.tr('appTagline'),
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.white.withOpacity(0.9),
@@ -83,26 +84,26 @@ class WelcomeScreen extends StatelessWidget {
                     children: [
                       _buildFeatureItem(
                         Icons.text_fields,
-                        'Text Recognition',
-                        'Convert handwriting to digital text',
+                        context.tr('featureTextRecognition'),
+                        context.tr('featureTextRecognitionDesc'),
                       ),
                       const SizedBox(height: 16),
                       _buildFeatureItem(
                         Icons.lightbulb_outline,
-                        'Text Simplification',
-                        'Make complex text easier to read',
+                        context.tr('featureTextSimplification'),
+                        context.tr('featureTextSimplificationDesc'),
                       ),
                       const SizedBox(height: 16),
                       _buildFeatureItem(
                         Icons.accessibility_new,
-                        'Accessibility Features',
-                        'High contrast, large fonts, and more',
+                        context.tr('featureAccessibility'),
+                        context.tr('featureAccessibilityDesc'),
                       ),
                       const SizedBox(height: 16),
                       _buildFeatureItem(
                         Icons.volume_up,
-                        'Audio Support',
-                        'Text-to-speech for better comprehension',
+                        context.tr('featureAudioSupport'),
+                        context.tr('featureAudioSupportDesc'),
                       ),
                     ],
                   ),
@@ -132,9 +133,9 @@ class WelcomeScreen extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Get Started',
-                          style: TextStyle(
+                        Text(
+                          context.tr('getStarted'),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -159,7 +160,7 @@ class WelcomeScreen extends StatelessWidget {
                         );
                       },
                       child: Text(
-                        'Set up Profile',
+                        context.tr('setupProfile'),
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.white.withOpacity(0.9),
@@ -171,7 +172,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Tap "Get Started" to begin using your smart pen',
+                  context.tr('getStartedHint'),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.8),
